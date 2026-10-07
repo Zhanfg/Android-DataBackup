@@ -10,6 +10,7 @@ import com.xayah.databackup.entity.BackupConfig
 import com.xayah.databackup.entity.Source
 import com.xayah.databackup.rootservice.RemoteRootService
 import com.xayah.databackup.util.BackupConfigSelectedUuid
+import com.xayah.databackup.util.CredentialStore
 import com.xayah.databackup.util.LogHelper
 import com.xayah.databackup.util.PathHelper
 import com.xayah.databackup.util.TimeHelper
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import kotlin.uuid.Uuid
 
 class BackupConfigRepository(
@@ -157,12 +159,27 @@ class BackupConfigRepository(
                 createNewBackup(localBackupPath)
                 val localConfigs = mutableListOf<BackupConfig>()
                 RemoteRootService.listFilePaths(path = localBackupPath, listFiles = false, listDirs = true).forEach {
-                    val config = RemoteRootService.readText(PathHelper.getBackupConfigFile(it.path))
+                    val configJson = RemoteRootService.readText(PathHelper.getBackupConfigFile(it.path))
                     if (it.isDirectory) {
-                        val backupConfig = runCatching { mMoshi.adapter<BackupConfig>().fromJson(config) }.getOrNull()
+                        val backupConfig = runCatching { mMoshi.adapter<BackupConfig>().fromJson(configJson) }.getOrNull()
                         (backupConfig ?: BackupConfig()).also { config ->
                             config.source = Source.LOCAL
                             config.path = it.path
+                            if (backupConfig != null && config.backupBackend is BackupBackend.Rustic) {
+                                val legacyPassword = runCatching {
+                                    JSONObject(configJson)
+                                        .optJSONObject("backup_backend")
+                                        ?.optString("password")
+                                        ?.takeIf(String::isNotBlank)
+                                }.getOrNull()
+                                val storedPassword = CredentialStore.getRusticPassword(config.uuidString)
+                                val password = storedPassword ?: legacyPassword ?: BackupBackend.DEFAULT_PASSWORD
+                                config.backupBackend = BackupBackend.Rustic(password)
+                                if (storedPassword == null && legacyPassword != null) {
+                                    CredentialStore.putRusticPassword(config.uuidString, password)
+                                    check(saveBackupConfig(config)) { "Failed to migrate legacy Rustic credential." }
+                                }
+                            }
                             localConfigs.add(config)
                         }
                     }
@@ -179,6 +196,9 @@ class BackupConfigRepository(
     }
 
     suspend fun saveBackupConfig(config: BackupConfig): Boolean {
+        (config.backupBackend as? BackupBackend.Rustic)?.let { backend ->
+            CredentialStore.putRusticPassword(config.uuidString, backend.password)
+        }
         val configPath = PathHelper.getBackupConfigFile(config.path)
         val configParentPath = PathHelper.getParentPath(configPath)
         if (RemoteRootService.mkdirs(configParentPath).not()) {
@@ -236,6 +256,7 @@ class BackupConfigRepository(
     suspend fun deleteConfig(uuid: String) {
         val config = _configs.value.firstOrNull { it.uuidString == uuid } ?: return
         if (RemoteRootService.deleteRecursively(config.path)) {
+            CredentialStore.removeRusticPassword(config.uuidString)
             _configs.update { list -> list.filterNot { it.uuidString == uuid } }
         }
     }
