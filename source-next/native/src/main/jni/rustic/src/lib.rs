@@ -2,6 +2,7 @@
 
 use std::error::Error;
 
+mod cloud_backend;
 mod error;
 mod jni_bridge;
 mod jni_progress;
@@ -12,6 +13,7 @@ mod repository;
 /// Result of a repository operation, with errors propagated from the underlying libraries.
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+pub use cloud_backend::{gdrive_repository_exists, init_gdrive_repository, validate_gdrive_repository};
 pub use progress::RusticProgressCallback;
 pub use repository::{
     check_repository, create_snapshot, create_snapshot_with_progress, delete_snapshot,
