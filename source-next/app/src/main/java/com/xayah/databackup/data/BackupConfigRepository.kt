@@ -89,7 +89,7 @@ class BackupConfigRepository(
 
     suspend fun createNewBackup(path: String) {
         _newConfig.value = createNewBackupDraft(path)
-        LogHelper.i(TAG, "createNewBackup", "newConfig: ${_newConfig.value}")
+        LogHelper.i(TAG, "createNewBackup", "Created backup draft: uuid=${_newConfig.value.uuidString}, path=${_newConfig.value.path}")
     }
 
     private suspend fun createNewBackupDraft(path: String): BackupConfig {
@@ -173,7 +173,7 @@ class BackupConfigRepository(
                 val selectedUuid = App.application.readString(BackupConfigSelectedUuid).first()
                 _selectedIndex.emit(_configs.value.indexOfFirst { it.uuidString == selectedUuid })
                 _isLoaded.value = true
-                LogHelper.i(TAG, "loadBackupConfigsFromLocal", "configs: ${_configs.value}")
+                LogHelper.i(TAG, "loadBackupConfigsFromLocal", "Loaded ${_configs.value.size} backup configs.")
             }
         }
     }
