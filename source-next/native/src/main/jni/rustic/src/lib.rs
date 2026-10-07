@@ -2,6 +2,7 @@
 
 use std::error::Error;
 
+#[cfg(feature = "rustic-gdrive")]
 mod cloud_backend;
 mod error;
 mod jni_bridge;
@@ -13,6 +14,7 @@ mod repository;
 /// Result of a repository operation, with errors propagated from the underlying libraries.
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
+#[cfg(feature = "rustic-gdrive")]
 pub use cloud_backend::{gdrive_repository_exists, init_gdrive_repository, validate_gdrive_repository};
 pub use progress::RusticProgressCallback;
 pub use repository::{

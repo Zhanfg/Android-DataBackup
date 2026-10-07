@@ -61,6 +61,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: RootService startup dependency guard
+        run: |
+          ! grep -q "initAndroidTls" app/src/main/java/com/xayah/databackup/rootservice/RemoteRootService.kt
+          grep -q 'default = \[\]' native/src/main/jni/rustic/Cargo.toml
+
       - name: Unit tests
         run: ./gradlew test --stacktrace
 
