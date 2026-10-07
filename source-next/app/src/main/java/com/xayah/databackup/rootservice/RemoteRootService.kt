@@ -308,6 +308,12 @@ object RemoteRootService {
             }
         }
 
+        override fun openReadOnly(path: String): ParcelFileDescriptor {
+            val file = File(path)
+            require(file.isFile) { "Not a readable regular file: $path" }
+            return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+        }
+
         override fun writeText(path: String, pfd: ParcelFileDescriptor) {
             var text = ""
             readFromParcel(pfd) { parcel -> parcel.readString()?.also { text = it } }
@@ -751,6 +757,9 @@ object RemoteRootService {
         getService()?.readText(path)?.also { pfd -> readFromParcel(pfd) { parcel -> parcel.readString()?.also { text = it } } }
         return text
     }
+
+    suspend fun openReadOnly(path: String): ParcelFileDescriptor? =
+        getService()?.openReadOnly(path)
 
     suspend fun writeText(path: String, text: String) {
         getService()?.writeText(

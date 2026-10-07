@@ -13,6 +13,9 @@ import com.xayah.databackup.data.BackupSelectionRepository
 import com.xayah.databackup.data.CallLogRepository
 import com.xayah.databackup.data.ContactRepository
 import com.xayah.databackup.data.cloud.CloudTransferJournalRepository
+import com.xayah.databackup.data.cloud.DirectCloudTransferRepository
+import com.xayah.databackup.data.cloud.GoogleDriveDirectUploadClient
+import com.xayah.databackup.data.cloud.OneDriveDirectUploadClient
 import com.xayah.databackup.data.FileRepository
 import com.xayah.databackup.data.GitHubReleaseRepository
 import com.xayah.databackup.data.MessageRepository
@@ -78,6 +81,9 @@ class App : Application(), SingletonImageLoader.Factory {
         singleOf(::NetworkRepository)
         singleOf(::ContactRepository)
         singleOf(::CloudTransferJournalRepository)
+        singleOf(::GoogleDriveDirectUploadClient)
+        singleOf(::OneDriveDirectUploadClient)
+        singleOf(::DirectCloudTransferRepository)
         singleOf(::CallLogRepository)
         singleOf(::MessageRepository)
         singleOf(::ArchiveBackupProcessRepository)
