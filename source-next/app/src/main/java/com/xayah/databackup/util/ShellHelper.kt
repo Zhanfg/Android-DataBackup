@@ -11,6 +11,11 @@ import kotlinx.coroutines.flow.first
 object ShellHelper {
     private const val TAG = "ShellHelper"
 
+    /**
+     * Quotes one argument for POSIX sh. Keep shell fallback commands argument-safe because they run as root.
+     */
+    private fun shellQuote(value: String): String = "'${value.replace("'", "'\\''")}'"
+
     private class EnvInitializer : Shell.Initializer() {
         private fun initShell(shell: Shell) {
             shell.newJob()
@@ -72,7 +77,7 @@ object ShellHelper {
     suspend fun rm(path: String) {
         val shell = getNewShell(App.application)
         if (shell != null) {
-            shell.newJob().to(null, null).add("rm $path").exec()
+            shell.newJob().to(null, null).add("rm -- ${shellQuote(path)}").exec()
             shell.close()
         } else {
             LogHelper.e(TAG, "rm", "Failed to get a new shell!")
