@@ -27,7 +27,6 @@ FetchContent_MakeAvailable(Corrosion)
 
 corrosion_import_crate(
         MANIFEST_PATH Cargo.toml
-        LOCKED
 )
 
 corrosion_set_env_vars(rustic

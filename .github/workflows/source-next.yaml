@@ -71,7 +71,7 @@ jobs:
         run: ./gradlew :app:assembleDebug --stacktrace
 
       - name: Rustic tests
-        run: cargo test --locked --manifest-path native/src/main/jni/rustic/Cargo.toml
+        run: cargo test --manifest-path native/src/main/jni/rustic/Cargo.toml
 
       - name: Upload reports
         if: always()
@@ -82,3 +82,4 @@ jobs:
           path: |
             source-next/**/build/reports/**
             source-next/**/build/test-results/**
+            source-next/native/src/main/jni/rustic/Cargo.lock
