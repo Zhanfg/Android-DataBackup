@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.Date
-import kotlin.math.max
 
 sealed interface UpdatesStatus {
     data object Loading : UpdatesStatus
@@ -68,7 +67,7 @@ class UpdatesViewModel(
                 val updateAvailable = if (latestVersion.isEmpty()) {
                     false
                 } else {
-                    compareVersions(latestVersion) > 0
+                    compareVersionNames(latestVersion, BuildConfig.VERSION_NAME) > 0
                 }
 
                 _uiState.update {
@@ -130,33 +129,6 @@ class UpdatesViewModel(
         return formatter.format(Date(timestamp))
     }
 
-    private fun compareVersions(version: String): Int {
-        val partsA = extractVersionParts(version)
-        val partsB = extractVersionParts(BuildConfig.VERSION_NAME)
-        val maxLength = max(partsA.size, partsB.size)
-
-        for (index in 0 until maxLength) {
-            val a = partsA.getOrElse(index) { 0 }
-            val b = partsB.getOrElse(index) { 0 }
-            if (a != b) {
-                return a.compareTo(b)
-            }
-        }
-        return 0
-    }
-
-    private fun extractVersionParts(version: String): List<Int> {
-        val normalized = version
-            .trim()
-            .lowercase(java.util.Locale.US)
-            .removePrefix("v")
-        val parts = Regex("\\d+")
-            .findAll(normalized)
-            .mapNotNull { match -> match.value.toIntOrNull() }
-            .toList()
-        return parts.ifEmpty { listOf(0) }
-    }
-
     private fun sanitizeErrorMessage(message: String): String {
         val normalized = message
             .lineSequence()
@@ -176,4 +148,57 @@ class UpdatesViewModel(
             normalized
         }
     }
+}
+
+
+internal fun compareVersionNames(left: String, right: String): Int {
+    val a = parseVersionName(left)
+    val b = parseVersionName(right)
+
+    val coreLength = maxOf(a.core.size, b.core.size, 3)
+    for (index in 0 until coreLength) {
+        val leftPart = a.core.getOrElse(index) { 0 }
+        val rightPart = b.core.getOrElse(index) { 0 }
+        if (leftPart != rightPart) return leftPart.compareTo(rightPart)
+    }
+
+    if (a.preRelease == null && b.preRelease == null) return 0
+    if (a.preRelease == null) return 1
+    if (b.preRelease == null) return -1
+
+    val count = maxOf(a.preRelease.size, b.preRelease.size)
+    for (index in 0 until count) {
+        val leftPart = a.preRelease.getOrNull(index) ?: return -1
+        val rightPart = b.preRelease.getOrNull(index) ?: return 1
+        val leftNumber = leftPart.toIntOrNull()
+        val rightNumber = rightPart.toIntOrNull()
+        val comparison = when {
+            leftNumber != null && rightNumber != null -> leftNumber.compareTo(rightNumber)
+            leftNumber != null -> -1
+            rightNumber != null -> 1
+            else -> leftPart.compareTo(rightPart, ignoreCase = true)
+        }
+        if (comparison != 0) return comparison
+    }
+    return 0
+}
+
+private data class ParsedVersionName(
+    val core: List<Int>,
+    val preRelease: List<String>?,
+)
+
+private fun parseVersionName(version: String): ParsedVersionName {
+    val normalized = version.trim().removePrefix("v").removePrefix("V")
+    val withoutBuild = normalized.substringBefore('+')
+    val corePart = withoutBuild.substringBefore('-')
+    val preReleasePart = withoutBuild.substringAfter('-', missingDelimiterValue = "")
+    val core = corePart.split('.').map { part ->
+        part.takeWhile(Char::isDigit).toIntOrNull() ?: 0
+    }.ifEmpty { listOf(0) }
+    val preRelease = preReleasePart
+        .takeIf(String::isNotBlank)
+        ?.split('.', '-', '_')
+        ?.filter(String::isNotBlank)
+    return ParsedVersionName(core, preRelease)
 }
