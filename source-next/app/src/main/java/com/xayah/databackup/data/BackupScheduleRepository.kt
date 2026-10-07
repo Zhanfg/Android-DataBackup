@@ -11,6 +11,7 @@ import com.xayah.databackup.util.readString
 import com.xayah.databackup.util.saveString
 import com.xayah.databackup.workers.ScheduledBackupWorker
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -53,7 +54,7 @@ class BackupScheduleRepository {
     }
 
     private suspend fun scheduledUuidsValue(): Set<String> =
-        scheduledUuids.firstValue()
+        scheduledUuids.first()
 
     private fun schedule(configUuid: String) {
         val constraints = Constraints.Builder()
@@ -89,5 +90,4 @@ class BackupScheduleRepository {
     private fun decode(raw: String): Set<String> =
         raw.split(',').map(String::trim).filter(String::isNotBlank).toSet()
 
-    private suspend fun <T> Flow<T>.firstValue(): T = kotlinx.coroutines.flow.first(this)
 }
