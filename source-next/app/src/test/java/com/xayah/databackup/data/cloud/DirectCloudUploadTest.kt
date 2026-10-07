@@ -17,4 +17,15 @@ class DirectCloudUploadTest {
     fun chunkCannotExceedDeclaredSize() {
         validateUploadChunk(offset = 8, totalBytes = 10, bytes = ByteArray(3))
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun downloadRangeRejectsZeroLength() {
+        validateDownloadRange(offset = 0, length = 0)
+    }
+
+    @Test
+    fun providerScopesStayNarrow() {
+        assertTrue(CloudAuthorizationScopes.GOOGLE_DRIVE_FILE.endsWith("/drive.file"))
+        assertTrue(CloudAuthorizationScopes.ONEDRIVE_APP_FOLDER.contains("AppFolder"))
+    }
 }

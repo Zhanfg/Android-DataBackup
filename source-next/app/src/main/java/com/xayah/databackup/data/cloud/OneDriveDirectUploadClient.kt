@@ -2,8 +2,10 @@ package com.xayah.databackup.data.cloud
 
 import android.net.Uri
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.put
@@ -15,9 +17,11 @@ import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.Closeable
 
@@ -47,6 +51,81 @@ class OneDriveDirectUploadClient : Closeable {
 
     override fun close() = mClient.close()
 
+    private fun encodePath(path: String): String =
+        path.trim('/').split('/').filter(String::isNotBlank).joinToString("/") { Uri.encode(it) }
+
+    private fun childrenUrl(remoteDirectory: String): String {
+        val path = encodePath(remoteDirectory)
+        return if (path.isBlank()) {
+            "https://graph.microsoft.com/v1.0/me/drive/special/approot/children"
+        } else {
+            "https://graph.microsoft.com/v1.0/me/drive/special/approot:/$path:/children"
+        }
+    }
+
+    suspend fun listChildren(accessToken: String, remoteDirectory: String = ""): List<CloudRemoteItem> {
+        require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
+        val response = mClient.get(childrenUrl(remoteDirectory)) {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+        }
+        if (response.status.value !in 200..299) {
+            throw DirectCloudException(response.status.value, "OneDrive list failed.")
+        }
+        return mJson.parseToJsonElement(response.bodyAsText()).jsonObject["value"]
+            ?.jsonArray
+            ?.map { value ->
+                val item = value.jsonObject
+                CloudRemoteItem(
+                    id = item.getValue("id").jsonPrimitive.content,
+                    name = item.getValue("name").jsonPrimitive.content,
+                    size = item["size"]?.jsonPrimitive?.longOrNull,
+                    isDirectory = item["folder"] != null,
+                    modifiedAt = item["lastModifiedDateTime"]?.jsonPrimitive?.contentOrNull,
+                )
+            }.orEmpty()
+    }
+
+    suspend fun createFolder(accessToken: String, remoteDirectory: String, name: String): CloudRemoteItem {
+        require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
+        require(name.isNotBlank()) { "Missing OneDrive folder name." }
+        val response = mClient.post(childrenUrl(remoteDirectory)) {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildJsonObject {
+                    put("name", name)
+                    put("folder", buildJsonObject {})
+                    put("@microsoft.graph.conflictBehavior", "fail")
+                }.toString()
+            )
+        }
+        if (response.status.value !in 200..299) {
+            throw DirectCloudException(response.status.value, "OneDrive folder creation failed.")
+        }
+        val item = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        return CloudRemoteItem(
+            id = item.getValue("id").jsonPrimitive.content,
+            name = item.getValue("name").jsonPrimitive.content,
+            size = item["size"]?.jsonPrimitive?.longOrNull,
+            isDirectory = true,
+            modifiedAt = item["lastModifiedDateTime"]?.jsonPrimitive?.contentOrNull,
+        )
+    }
+
+    suspend fun downloadRange(accessToken: String, itemId: String, offset: Long, length: Int): ByteArray {
+        require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
+        require(itemId.isNotBlank()) { "Missing OneDrive item id." }
+        validateDownloadRange(offset, length)
+        val response = mClient.get("https://graph.microsoft.com/v1.0/me/drive/items/$itemId/content") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+            header(HttpHeaders.Range, "bytes=$offset-${offset + length - 1}")
+        }
+        if (response.status.value != 200 && response.status.value != 206) {
+            throw DirectCloudException(response.status.value, "OneDrive range download failed.")
+        }
+        return response.body()
+    }
+
     suspend fun createSession(
         accessToken: String,
         remoteDirectory: String,
@@ -55,11 +134,7 @@ class OneDriveDirectUploadClient : Closeable {
         require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
         require(fileName.isNotBlank()) { "Missing OneDrive file name." }
 
-        val path = (remoteDirectory.trim('/') + "/" + fileName)
-            .trim('/')
-            .split('/')
-            .filter(String::isNotBlank)
-            .joinToString("/") { Uri.encode(it) }
+        val path = encodePath(remoteDirectory.trim('/') + "/" + fileName)
         val body = buildJsonObject {
             put("item", buildJsonObject {
                 put("@microsoft.graph.conflictBehavior", "replace")
