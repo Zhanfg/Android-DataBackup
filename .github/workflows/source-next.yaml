@@ -69,10 +69,8 @@ jobs:
       - name: Unit tests
         run: ./gradlew test --stacktrace
 
-      - name: Lint
-        id: lint
-        continue-on-error: true
-        run: ./gradlew lint --stacktrace
+      - name: Rustic tests
+        run: cargo test --manifest-path native/src/main/jni/rustic/Cargo.toml
 
       - name: Assemble debug
         run: ./gradlew :app:assembleDebug --stacktrace
@@ -82,6 +80,15 @@ jobs:
           du -h app/build/outputs/apk/debug/*.apk || true
           find app/build -type f -name '*.so' -exec du -h {} + | sort -h || true
 
+      - name: Verify APK signing and 16 KiB alignment
+        run: |
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          test -n "$APK"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -89,8 +96,10 @@ jobs:
           if-no-files-found: error
           path: source-next/app/build/outputs/apk/debug/*.apk
 
-      - name: Rustic tests
-        run: cargo test --manifest-path native/src/main/jni/rustic/Cargo.toml
+      - name: Lint report
+        id: lint
+        continue-on-error: true
+        run: ./gradlew lint --stacktrace
 
       - name: Upload reports
         if: always()
