@@ -1,5 +1,6 @@
 package com.xayah.libnative
 
+import android.content.Context
 import androidx.annotation.Keep
 
 object RusticWrapper {
@@ -12,6 +13,12 @@ object RusticWrapper {
     )
 
     fun initLogger() = nativeInitLogger()
+
+    /**
+     * Initializes Rust's Android platform certificate verifier before any OpenDAL HTTPS traffic.
+     * The verifier is process-global and treats repeated initialization as a no-op.
+     */
+    fun initAndroidTls(context: Context) = nativeInitAndroidTls(context.applicationContext)
 
     fun initRepository(repositoryPath: String, password: String) {
         nativeInitRepository(repositoryPath, password)
@@ -91,6 +98,7 @@ object RusticWrapper {
 
     private external fun nativeReadSnapshotTextFiles(repositoryPath: String, password: String, snapshotId: String, paths: Array<String>): String
     private external fun nativeInitLogger()
+    private external fun nativeInitAndroidTls(context: Context)
     private external fun nativeInitRepository(repositoryPath: String, password: String)
     private external fun nativeRepositoryExists(repositoryPath: String): Boolean
     private external fun nativeValidateRepository(repositoryPath: String, password: String)

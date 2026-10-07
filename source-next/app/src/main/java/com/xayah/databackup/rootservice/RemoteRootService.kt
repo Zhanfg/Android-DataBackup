@@ -123,7 +123,10 @@ object RemoteRootService {
             RusticWrapper.initLogger()
         }
 
-        override fun onBind(intent: Intent): IBinder = Impl(applicationContext).apply { onBind() }
+        override fun onBind(intent: Intent): IBinder {
+            RusticWrapper.initAndroidTls(applicationContext)
+            return Impl(applicationContext).apply { onBind() }
+        }
     }
 
     private class Impl(private val mContext: Context) : IRemoteRootService.Stub() {

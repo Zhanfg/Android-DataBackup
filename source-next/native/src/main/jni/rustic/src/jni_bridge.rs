@@ -23,6 +23,28 @@ pub extern "system" fn Java_com_xayah_libnative_RusticWrapper_nativeInitLogger<'
 }
 
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_com_xayah_libnative_RusticWrapper_nativeInitAndroidTls<'local>(
+    mut unowned_env: EnvUnowned<'local>,
+    _this: JObject<'local>,
+    context: JObject<'local>,
+) {
+    unowned_env
+        .with_env(|env| -> Result<(), NativeError> {
+            #[cfg(target_os = "android")]
+            {
+                rustls_platform_verifier::android::init_with_env(env, context)
+                    .map_err(NativeError::from)?;
+            }
+            #[cfg(not(target_os = "android"))]
+            {
+                let _ = (env, context);
+            }
+            Ok(())
+        })
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_xayah_libnative_RusticWrapper_nativeInitRepository<'local>(
     mut unowned_env: EnvUnowned<'local>,
     _this: JObject<'local>,
