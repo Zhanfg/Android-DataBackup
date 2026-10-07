@@ -47,11 +47,9 @@ jobs:
           distribution: zulu
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install native toolchain
-        run: sdkmanager "ndk;30.0.16248370" "cmake;3.22.1"
+        run: |
+          sdkmanager --install "ndk;30.0.16248370" "cmake;3.22.1"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
