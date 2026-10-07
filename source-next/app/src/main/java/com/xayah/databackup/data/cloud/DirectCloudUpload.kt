@@ -3,7 +3,10 @@ package com.xayah.databackup.data.cloud
 data class DirectUploadSession(
     val uploadUrl: String,
     val expiresAt: String? = null,
-)
+) {
+    override fun toString(): String =
+        "DirectUploadSession(uploadUrl=<redacted>, expiresAt=$expiresAt)"
+}
 
 data class DirectUploadProgress(
     val completed: Boolean,

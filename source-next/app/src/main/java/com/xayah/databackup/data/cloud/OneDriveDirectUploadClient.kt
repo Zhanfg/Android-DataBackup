@@ -13,7 +13,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentType
-import io.ktor.http.isSuccess
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -25,6 +24,8 @@ import java.io.Closeable
 /**
  * Thin Microsoft Graph v1.0 uploader for OneDrive.
  *
+ * Files are created below OneDrive's application folder so the Android client can request the
+ * narrow Files.ReadWrite.AppFolder delegated permission instead of broad drive access.
  * Upload-session PUT requests intentionally omit the Authorization header because the opaque
  * upload URL contains the authorization context supplied by Microsoft.
  */
@@ -66,13 +67,13 @@ class OneDriveDirectUploadClient : Closeable {
             })
         }
         val response = mClient.post(
-            "https://graph.microsoft.com/v1.0/me/drive/root:/$path:/createUploadSession"
+            "https://graph.microsoft.com/v1.0/me/drive/special/approot:/$path:/createUploadSession"
         ) {
             header(HttpHeaders.Authorization, "Bearer $accessToken")
             contentType(ContentType.Application.Json)
             setBody(body.toString())
         }
-        if (!response.status.isSuccess()) {
+        if (response.status.value !in 200..299) {
             throw DirectCloudException(response.status.value, "OneDrive upload-session creation failed.")
         }
         val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject

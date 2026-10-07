@@ -23,6 +23,7 @@ import android.os.DeadObjectException
 import android.os.IBinder
 import android.os.Parcel
 import android.os.ParcelFileDescriptor
+import android.os.Process
 import android.os.RemoteException
 import android.os.StatFs
 import android.os.UserManagerHidden
@@ -158,6 +159,12 @@ object RemoteRootService {
                     (flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
         }
 
+        private fun PackageInfo.isCoreSystemPackage(): Boolean {
+            val uid = applicationInfo?.uid ?: return false
+            val appId = uid % 100_000
+            return isPreinstalledSystemPackage() && appId < Process.FIRST_APPLICATION_UID
+        }
+
         private fun PackageInfo.signerDigests(): Set<String> {
             val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 signingInfo?.let { info ->
@@ -165,7 +172,7 @@ object RemoteRootService {
                 }
             } else {
                 @Suppress("DEPRECATION")
-                signatures
+                this.signatures
             } ?: return emptySet()
 
             return signatures.mapTo(linkedSetOf()) { signature ->
@@ -186,7 +193,7 @@ object RemoteRootService {
                 val trustedSystemSigners = packagesByUser.values
                     .asSequence()
                     .flatten()
-                    .filter { it.isPreinstalledSystemPackage() }
+                    .filter { it.isCoreSystemPackage() }
                     .flatMap { it.signerDigests().asSequence() }
                     .toSet()
 
