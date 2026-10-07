@@ -2,6 +2,7 @@ package com.xayah.databackup.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import com.xayah.databackup.database.dao.AppDao
 import com.xayah.databackup.database.dao.CallLogDao
 import com.xayah.databackup.database.dao.ContactDao
@@ -23,9 +24,17 @@ import com.xayah.databackup.database.entity.Sms
         Sms::class,
         Mms::class,
     ],
-    version = 1
+    version = 2
 )
 abstract class AppDatabase : RoomDatabase() {
+    companion object {
+        val MIGRATION_1_2 = Migration(1, 2) { database ->
+            database.execSQL(
+                "ALTER TABLE apps ADD COLUMN info_isSystemTrusted INTEGER NOT NULL DEFAULT 0"
+            )
+        }
+    }
+
     abstract fun appDao(): AppDao
     abstract fun networkDao(): NetworkDao
     abstract fun contactDao(): ContactDao
