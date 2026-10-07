@@ -128,21 +128,30 @@ object RemoteRootService {
     }
 
     private class Impl(private val mContext: Context) : IRemoteRootService.Stub() {
-        private lateinit var mSystemContext: Context
+        private val mSystemContext: Context by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            runCatching {
+                mContext.createPackageContext("android", Context.CONTEXT_IGNORE_SECURITY)
+            }.getOrElse {
+                ActivityThread.systemMain().systemContext
+            }
+        }
         private lateinit var mPackageManager: PackageManager
         private lateinit var mPackageManagerHidden: PackageManagerHidden
         private lateinit var mUserManager: UserManagerHidden
-        private lateinit var mWifiManager: WifiManagerHidden
-        private lateinit var mActivityManager: ActivityManagerHidden
+        private val mWifiManager: WifiManagerHidden by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            mContext.getSystemService(Context.WIFI_SERVICE).castTo()
+        }
+        private val mActivityManager: ActivityManagerHidden by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            mContext.getSystemService(Context.ACTIVITY_SERVICE).castTo()
+        }
         private val mLock = Any()
 
         fun onBind() {
-            mSystemContext = ActivityThread.systemMain().systemContext
-            mPackageManager = mSystemContext.packageManager
+            // Keep RootService startup minimal. Optional/ROM-sensitive services are initialized
+            // only when their feature is used, so a vendor API change cannot take down all backup.
+            mPackageManager = mContext.packageManager
             mPackageManagerHidden = mPackageManager.castTo()
-            mUserManager = UserManagerHidden.get(mSystemContext).castTo()
-            mWifiManager = mSystemContext.getSystemService(Context.WIFI_SERVICE).castTo()
-            mActivityManager = mSystemContext.getSystemService(Context.ACTIVITY_SERVICE).castTo()
+            mUserManager = UserManagerHidden.get(mContext).castTo()
         }
 
         override fun testConnection() {}
