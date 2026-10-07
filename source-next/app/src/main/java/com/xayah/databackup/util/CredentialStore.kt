@@ -46,23 +46,24 @@ object CredentialStore {
         }
     }
 
-    fun putRusticPassword(configUuid: String, password: String) {
+    internal fun putSecret(key: String, value: String) {
+        require(key.isNotBlank()) { "Credential key must not be blank." }
         val cipher = Cipher.getInstance(CIPHER).apply {
             init(Cipher.ENCRYPT_MODE, getOrCreateKey())
         }
-        val ciphertext = cipher.doFinal(password.toByteArray(Charsets.UTF_8))
+        val ciphertext = cipher.doFinal(value.toByteArray(Charsets.UTF_8))
         val payload = ByteBuffer.allocate(Int.SIZE_BYTES + cipher.iv.size + ciphertext.size)
             .putInt(cipher.iv.size)
             .put(cipher.iv)
             .put(ciphertext)
             .array()
         preferences.edit()
-            .putString(RUSTIC_PREFIX + configUuid, Base64.encodeToString(payload, Base64.NO_WRAP))
+            .putString(key, Base64.encodeToString(payload, Base64.NO_WRAP))
             .apply()
     }
 
-    fun getRusticPassword(configUuid: String): String? {
-        val encoded = preferences.getString(RUSTIC_PREFIX + configUuid, null) ?: return null
+    internal fun getSecret(key: String): String? {
+        val encoded = preferences.getString(key, null) ?: return null
         return runCatching {
             val payload = Base64.decode(encoded, Base64.NO_WRAP)
             val buffer = ByteBuffer.wrap(payload)
@@ -77,7 +78,16 @@ object CredentialStore {
         }.getOrNull()
     }
 
-    fun removeRusticPassword(configUuid: String) {
-        preferences.edit().remove(RUSTIC_PREFIX + configUuid).apply()
+    internal fun removeSecret(key: String) {
+        preferences.edit().remove(key).apply()
     }
+
+    fun putRusticPassword(configUuid: String, password: String) =
+        putSecret(RUSTIC_PREFIX + configUuid, password)
+
+    fun getRusticPassword(configUuid: String): String? =
+        getSecret(RUSTIC_PREFIX + configUuid)
+
+    fun removeRusticPassword(configUuid: String) =
+        removeSecret(RUSTIC_PREFIX + configUuid)
 }

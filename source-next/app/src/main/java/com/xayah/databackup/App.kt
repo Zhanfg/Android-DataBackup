@@ -12,6 +12,7 @@ import com.xayah.databackup.data.BackupConfigRepository
 import com.xayah.databackup.data.BackupSelectionRepository
 import com.xayah.databackup.data.CallLogRepository
 import com.xayah.databackup.data.ContactRepository
+import com.xayah.databackup.data.cloud.CloudTransferJournalRepository
 import com.xayah.databackup.data.FileRepository
 import com.xayah.databackup.data.GitHubReleaseRepository
 import com.xayah.databackup.data.MessageRepository
@@ -76,6 +77,7 @@ class App : Application(), SingletonImageLoader.Factory {
         singleOf(::FileRepository)
         singleOf(::NetworkRepository)
         singleOf(::ContactRepository)
+        singleOf(::CloudTransferJournalRepository)
         singleOf(::CallLogRepository)
         singleOf(::MessageRepository)
         singleOf(::ArchiveBackupProcessRepository)
