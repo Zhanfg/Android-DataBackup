@@ -28,12 +28,6 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.Closeable
 
-/**
- * Thin Google Drive v3 resumable uploader.
- *
- * Authentication is intentionally external: callers provide a short-lived OAuth access token.
- * File bytes are sent directly to Google's resumable upload endpoint.
- */
 class GoogleDriveDirectUploadClient : Closeable {
     companion object {
         const val CHUNK_GRANULARITY = 256 * 1024
@@ -55,27 +49,39 @@ class GoogleDriveDirectUploadClient : Closeable {
     suspend fun listChildren(accessToken: String, parentId: String): List<CloudRemoteItem> {
         require(accessToken.isNotBlank()) { "Missing Google access token." }
         require(parentId.isNotBlank()) { "Missing Drive parent id." }
-        val response = mClient.get("https://www.googleapis.com/drive/v3/files") {
-            header(HttpHeaders.Authorization, "Bearer $accessToken")
-            parameter("q", "'$parentId' in parents and trashed = false")
-            parameter("fields", "files(id,name,mimeType,size,modifiedTime)")
-            parameter("pageSize", 1000)
-        }
-        if (!response.status.isSuccess()) {
-            throw DirectCloudException(response.status.value, "Google Drive list failed.")
-        }
-        return mJson.parseToJsonElement(response.bodyAsText()).jsonObject["files"]
-            ?.jsonArray
-            ?.map { value ->
+
+        val items = mutableListOf<CloudRemoteItem>()
+        var pageToken: String? = null
+        val seenTokens = mutableSetOf<String>()
+        do {
+            val response = mClient.get("https://www.googleapis.com/drive/v3/files") {
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+                parameter("q", "'$parentId' in parents and trashed = false")
+                parameter("fields", "nextPageToken,files(id,name,mimeType,size,modifiedTime)")
+                parameter("pageSize", 1000)
+                pageToken?.let { parameter("pageToken", it) }
+            }
+            if (!response.status.isSuccess()) {
+                throw DirectCloudException(response.status.value, "Google Drive list failed.")
+            }
+
+            val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
+            json["files"]?.jsonArray?.forEach { value ->
                 val item = value.jsonObject
-                CloudRemoteItem(
+                items += CloudRemoteItem(
                     id = item.getValue("id").jsonPrimitive.content,
                     name = item.getValue("name").jsonPrimitive.content,
                     size = item["size"]?.jsonPrimitive?.longOrNull,
                     isDirectory = item["mimeType"]?.jsonPrimitive?.content == "application/vnd.google-apps.folder",
                     modifiedAt = item["modifiedTime"]?.jsonPrimitive?.contentOrNull,
                 )
-            }.orEmpty()
+            }
+            pageToken = json["nextPageToken"]?.jsonPrimitive?.contentOrNull
+            if (pageToken != null && !seenTokens.add(pageToken!!)) {
+                error("Google Drive returned a repeated page token.")
+            }
+        } while (pageToken != null)
+        return items
     }
 
     suspend fun createFolder(accessToken: String, name: String, parentId: String? = null): CloudRemoteItem {
@@ -155,6 +161,28 @@ class GoogleDriveDirectUploadClient : Closeable {
         return DirectUploadSession(uploadUrl)
     }
 
+    suspend fun queryProgress(
+        session: DirectUploadSession,
+        totalBytes: Long,
+    ): DirectUploadProgress {
+        require(totalBytes > 0) { "Upload size must be positive." }
+        val response = mClient.put(session.uploadUrl) {
+            header(HttpHeaders.ContentLength, 0)
+            header("Content-Range", "bytes */$totalBytes")
+            setBody(ByteArrayContent(ByteArray(0), ContentType.Application.OctetStream))
+        }
+        if (response.status.isSuccess()) {
+            return DirectUploadProgress(completed = true, nextOffset = totalBytes)
+        }
+        if (response.status.value == 308) {
+            return DirectUploadProgress(
+                completed = false,
+                nextOffset = nextOffsetFromAcknowledgedRange(response.headers["Range"]),
+            )
+        }
+        throw DirectCloudException(response.status.value, "Google Drive upload-session status query failed.")
+    }
+
     suspend fun uploadChunk(
         session: DirectUploadSession,
         offset: Long,
@@ -179,15 +207,11 @@ class GoogleDriveDirectUploadClient : Closeable {
             return DirectUploadProgress(completed = true, nextOffset = totalBytes)
         }
         if (response.status.value == 308) {
-            val acknowledgedEnd = response.headers["Range"]
-                ?.substringAfterLast('-')
-                ?.toLongOrNull()
             return DirectUploadProgress(
                 completed = false,
-                nextOffset = acknowledgedEnd?.plus(1) ?: offset,
+                nextOffset = nextOffsetFromAcknowledgedRange(response.headers["Range"]),
             )
         }
-        // Consume the response without surfacing provider text that could contain sensitive context.
         runCatching { response.bodyAsText() }
         throw DirectCloudException(response.status.value, "Google Drive chunk upload failed.")
     }

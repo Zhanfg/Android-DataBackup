@@ -1,6 +1,8 @@
 package com.xayah.databackup.data.cloud
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -27,5 +29,17 @@ class DirectCloudUploadTest {
     fun providerScopesStayNarrow() {
         assertTrue(CloudAuthorizationScopes.GOOGLE_DRIVE_FILE.endsWith("/drive.file"))
         assertTrue(CloudAuthorizationScopes.ONEDRIVE_APP_FOLDER.contains("AppFolder"))
+    }
+
+    @Test
+    fun acknowledgedRangeConvertsToNextOffset() {
+        assertEquals(43L, nextOffsetFromAcknowledgedRange("bytes=0-42"))
+        assertEquals(0L, nextOffsetFromAcknowledgedRange(null))
+    }
+
+    @Test
+    fun missingRangesUseEarliestOffset() {
+        assertEquals(72797L, nextOffsetFromMissingRanges(listOf("78929-90000", "72797-72897")))
+        assertNull(nextOffsetFromMissingRanges(emptyList()))
     }
 }

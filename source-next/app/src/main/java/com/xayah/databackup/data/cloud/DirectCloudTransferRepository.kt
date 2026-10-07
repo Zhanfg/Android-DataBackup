@@ -63,12 +63,29 @@ class DirectCloudTransferRepository(
     suspend fun resume(transferId: String) {
         val transfer = requireNotNull(mJournal.load(transferId)) { "Transfer journal not found: $transferId" }
         val provider = CloudProvider.valueOf(transfer.journal.provider)
+        val remoteProgress = when (provider) {
+            CloudProvider.GOOGLE_DRIVE -> mGoogleDrive.queryProgress(
+                session = transfer.session,
+                totalBytes = transfer.journal.totalBytes,
+            )
+            CloudProvider.ONEDRIVE -> mOneDrive.queryProgress(transfer.session)
+        }
+        mJournal.updateProgress(transferId, remoteProgress, transfer.session)
+        if (remoteProgress.completed) return
+        check(remoteProgress.nextOffset in 0 until transfer.journal.totalBytes) {
+            "Cloud provider returned an invalid resume offset."
+        }
+
         val pfd = requireNotNull(RemoteRootService.openReadOnly(transfer.journal.localPath)) {
             "Root service could not open upload source."
         }
+        check(pfd.statSize == transfer.journal.totalBytes) {
+            pfd.close()
+            "Upload source changed size after the transfer was created."
+        }
         ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
-            stream.channel.position(transfer.journal.nextOffset)
-            var offset = transfer.journal.nextOffset
+            var offset = remoteProgress.nextOffset
+            stream.channel.position(offset)
             while (offset < transfer.journal.totalBytes) {
                 val remaining = transfer.journal.totalBytes - offset
                 val chunkSize = when (provider) {
@@ -96,7 +113,9 @@ class DirectCloudTransferRepository(
                 mJournal.updateProgress(transferId, progress, transfer.session)
                 if (progress.completed) return
 
-                check(progress.nextOffset > offset) { "Cloud provider did not advance the upload offset." }
+                check(progress.nextOffset > offset && progress.nextOffset < transfer.journal.totalBytes) {
+                    "Cloud provider did not return a valid forward upload offset."
+                }
                 offset = progress.nextOffset
                 stream.channel.position(offset)
             }

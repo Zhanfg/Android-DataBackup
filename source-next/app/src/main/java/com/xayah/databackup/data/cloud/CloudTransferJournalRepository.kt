@@ -58,7 +58,12 @@ class CloudTransferJournalRepository {
             return
         }
         CredentialStore.putSecret(sessionKey(id), session.uploadUrl)
-        mDao.updateProgress(id, progress.nextOffset, session.expiresAt, System.currentTimeMillis())
+        mDao.updateProgress(
+            id = id,
+            nextOffset = progress.nextOffset,
+            sessionExpiresAt = progress.expiresAt ?: session.expiresAt,
+            updatedAt = System.currentTimeMillis(),
+        )
     }
 
     suspend fun replaceSession(id: String, session: DirectUploadSession, nextOffset: Long) {

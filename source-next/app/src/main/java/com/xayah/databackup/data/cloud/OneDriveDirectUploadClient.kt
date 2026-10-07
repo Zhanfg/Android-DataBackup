@@ -25,18 +25,11 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.Closeable
 
-/**
- * Thin Microsoft Graph v1.0 uploader for OneDrive.
- *
- * Files are created below OneDrive's application folder so the Android client can request the
- * narrow Files.ReadWrite.AppFolder delegated permission instead of broad drive access.
- * Upload-session PUT requests intentionally omit the Authorization header because the opaque
- * upload URL contains the authorization context supplied by Microsoft.
- */
 class OneDriveDirectUploadClient : Closeable {
     companion object {
         const val CHUNK_GRANULARITY = 320 * 1024
         const val DEFAULT_CHUNK_SIZE = 16 * CHUNK_GRANULARITY // 5 MiB
+        private const val GRAPH_ORIGIN = "https://graph.microsoft.com/"
     }
 
     private val mJson = Json { ignoreUnknownKeys = true }
@@ -65,24 +58,35 @@ class OneDriveDirectUploadClient : Closeable {
 
     suspend fun listChildren(accessToken: String, remoteDirectory: String = ""): List<CloudRemoteItem> {
         require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
-        val response = mClient.get(childrenUrl(remoteDirectory)) {
-            header(HttpHeaders.Authorization, "Bearer $accessToken")
-        }
-        if (response.status.value !in 200..299) {
-            throw DirectCloudException(response.status.value, "OneDrive list failed.")
-        }
-        return mJson.parseToJsonElement(response.bodyAsText()).jsonObject["value"]
-            ?.jsonArray
-            ?.map { value ->
+
+        val items = mutableListOf<CloudRemoteItem>()
+        var nextUrl: String? = childrenUrl(remoteDirectory)
+        val seenUrls = mutableSetOf<String>()
+        while (nextUrl != null) {
+            require(nextUrl.startsWith(GRAPH_ORIGIN)) { "OneDrive returned an unexpected pagination origin." }
+            if (!seenUrls.add(nextUrl)) error("OneDrive returned a repeated pagination URL.")
+
+            val response = mClient.get(nextUrl) {
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+            }
+            if (response.status.value !in 200..299) {
+                throw DirectCloudException(response.status.value, "OneDrive list failed.")
+            }
+
+            val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
+            json["value"]?.jsonArray?.forEach { value ->
                 val item = value.jsonObject
-                CloudRemoteItem(
+                items += CloudRemoteItem(
                     id = item.getValue("id").jsonPrimitive.content,
                     name = item.getValue("name").jsonPrimitive.content,
                     size = item["size"]?.jsonPrimitive?.longOrNull,
                     isDirectory = item["folder"] != null,
                     modifiedAt = item["lastModifiedDateTime"]?.jsonPrimitive?.contentOrNull,
                 )
-            }.orEmpty()
+            }
+            nextUrl = json["@odata.nextLink"]?.jsonPrimitive?.contentOrNull
+        }
+        return items
     }
 
     suspend fun createFolder(accessToken: String, remoteDirectory: String, name: String): CloudRemoteItem {
@@ -154,8 +158,26 @@ class OneDriveDirectUploadClient : Closeable {
         val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
         val uploadUrl = json["uploadUrl"]?.jsonPrimitive?.content
             ?: throw IllegalStateException("OneDrive did not return an upload URL.")
-        val expiresAt = json["expirationDateTime"]?.jsonPrimitive?.content
+        val expiresAt = json["expirationDateTime"]?.jsonPrimitive?.contentOrNull
         return DirectUploadSession(uploadUrl = uploadUrl, expiresAt = expiresAt)
+    }
+
+    suspend fun queryProgress(session: DirectUploadSession): DirectUploadProgress {
+        val response = mClient.get(session.uploadUrl)
+        if (response.status.value !in 200..299) {
+            throw DirectCloudException(response.status.value, "OneDrive upload-session status query failed.")
+        }
+        val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        val ranges = json["nextExpectedRanges"]?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            .orEmpty()
+        val nextOffset = nextOffsetFromMissingRanges(ranges)
+            ?: error("OneDrive upload session returned no missing range.")
+        return DirectUploadProgress(
+            completed = false,
+            nextOffset = nextOffset,
+            expiresAt = json["expirationDateTime"]?.jsonPrimitive?.contentOrNull,
+        )
     }
 
     suspend fun uploadChunk(
@@ -184,15 +206,14 @@ class OneDriveDirectUploadClient : Closeable {
         }
         if (response.status.value == 202) {
             val json = mJson.parseToJsonElement(response.bodyAsText()).jsonObject
-            val next = json["nextExpectedRanges"]
-                ?.jsonArray
-                ?.firstOrNull()
-                ?.jsonPrimitive
-                ?.content
-                ?.substringBefore('-')
-                ?.toLongOrNull()
-                ?: (offset + bytes.size)
-            return DirectUploadProgress(completed = false, nextOffset = next)
+            val ranges = json["nextExpectedRanges"]?.jsonArray
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                .orEmpty()
+            return DirectUploadProgress(
+                completed = false,
+                nextOffset = nextOffsetFromMissingRanges(ranges) ?: (offset + bytes.size),
+                expiresAt = json["expirationDateTime"]?.jsonPrimitive?.contentOrNull,
+            )
         }
         throw DirectCloudException(response.status.value, "OneDrive chunk upload failed.")
     }

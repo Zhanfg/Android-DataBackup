@@ -29,6 +29,7 @@ data class DirectUploadSession(
 data class DirectUploadProgress(
     val completed: Boolean,
     val nextOffset: Long,
+    val expiresAt: String? = null,
 )
 
 class DirectCloudException(
@@ -47,3 +48,16 @@ internal fun validateDownloadRange(offset: Long, length: Int) {
     require(offset >= 0) { "Download offset must be non-negative." }
     require(length > 0) { "Download length must be positive." }
 }
+
+internal fun nextOffsetFromAcknowledgedRange(rangeHeader: String?): Long =
+    rangeHeader
+        ?.substringAfterLast('-')
+        ?.trim()
+        ?.toLongOrNull()
+        ?.plus(1)
+        ?: 0L
+
+internal fun nextOffsetFromMissingRanges(ranges: Iterable<String>): Long? =
+    ranges.mapNotNull { range ->
+        range.substringBefore('-').trim().toLongOrNull()
+    }.minOrNull()
