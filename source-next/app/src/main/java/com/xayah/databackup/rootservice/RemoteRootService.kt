@@ -71,6 +71,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.seconds
@@ -144,27 +145,71 @@ object RemoteRootService {
 
         override fun testConnection() {}
 
+        private fun packageSigningFlags(): Int =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                PackageManager.GET_SIGNATURES
+            }
+
+        private fun PackageInfo.isPreinstalledSystemPackage(): Boolean {
+            val flags = applicationInfo?.flags ?: 0
+            return (flags and ApplicationInfo.FLAG_SYSTEM) != 0 ||
+                    (flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+        }
+
+        private fun PackageInfo.signerDigests(): Set<String> {
+            val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                signingInfo?.let { info ->
+                    if (info.hasMultipleSigners()) info.apkContentsSigners else info.signingCertificateHistory
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                signatures
+            } ?: return emptySet()
+
+            return signatures.mapTo(linkedSetOf()) { signature ->
+                MessageDigest.getInstance("SHA-256")
+                    .digest(signature.toByteArray())
+                    .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+            }
+        }
+
         override fun getInstalledAppInfos(): ParcelFileDescriptor {
             return writeToParcel(mContext) { parcel ->
                 val infos = mutableListOf<AppInfo>()
                 val users = mUserManager.users
+                val queryFlags = packageSigningFlags()
+                val packagesByUser = users.associate { user ->
+                    user.id to mPackageManagerHidden.getInstalledPackagesAsUser(queryFlags, user.id)
+                }
+                val trustedSystemSigners = packagesByUser.values
+                    .asSequence()
+                    .flatten()
+                    .filter { it.isPreinstalledSystemPackage() }
+                    .flatMap { it.signerDigests().asSequence() }
+                    .toSet()
+
                 users.forEach { user ->
-                    infos.addAll(mPackageManagerHidden.getInstalledPackagesAsUser(0, user.id).map {
+                    infos.addAll(packagesByUser.getValue(user.id).map { packageInfo ->
+                        val isSystemTrusted = packageInfo.isPreinstalledSystemPackage() ||
+                                packageInfo.signerDigests().any(trustedSystemSigners::contains)
                         AppInfo(
-                            packageName = it.packageName,
+                            packageName = packageInfo.packageName,
                             userId = user.id,
                             info = Info(
-                                uid = it.applicationInfo?.uid ?: 0,
-                                label = it.applicationInfo?.loadLabel(mPackageManager).toString(),
-                                versionName = it.versionName ?: "",
+                                uid = packageInfo.applicationInfo?.uid ?: 0,
+                                label = packageInfo.applicationInfo?.loadLabel(mPackageManager).toString(),
+                                versionName = packageInfo.versionName ?: "",
                                 versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                    it.longVersionCode
+                                    packageInfo.longVersionCode
                                 } else {
-                                    it.versionCode.toLong()
+                                    packageInfo.versionCode.toLong()
                                 },
-                                flags = it.applicationInfo?.flags ?: 0,
-                                firstInstallTime = it.firstInstallTime,
-                                lastUpdateTime = it.lastUpdateTime
+                                flags = packageInfo.applicationInfo?.flags ?: 0,
+                                isSystemTrusted = isSystemTrusted,
+                                firstInstallTime = packageInfo.firstInstallTime,
+                                lastUpdateTime = packageInfo.lastUpdateTime
                             )
                         )
                     })
