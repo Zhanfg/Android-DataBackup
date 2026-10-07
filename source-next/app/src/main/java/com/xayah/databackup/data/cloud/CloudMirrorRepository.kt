@@ -55,15 +55,15 @@ class CloudMirrorRepository(
         }
     }
 
-    suspend fun listRemoteBackupIds(provider: CloudProvider, accessToken: String): List<String> =
-        when (provider) {
+    suspend fun listRemoteBackupIds(provider: CloudProvider, accessToken: String): List<String> {
+        return when (provider) {
             CloudProvider.GOOGLE_DRIVE -> {
                 val appRoot = mGoogleDrive.listChildren(accessToken, "root")
                     .singleOrNull { it.name == CLOUD_ROOT && it.isDirectory }
                     ?: return emptyList()
                 mGoogleDrive.listChildren(accessToken, appRoot.id)
-                    .filter(CloudRemoteItem::isDirectory)
-                    .map(CloudRemoteItem::name)
+                    .filter { it.isDirectory }
+                    .map { it.name }
                     .distinct()
                     .sorted()
             }
@@ -72,12 +72,13 @@ class CloudMirrorRepository(
                     .singleOrNull { it.name == CLOUD_ROOT && it.isDirectory }
                     ?: return emptyList()
                 mOneDrive.listChildren(accessToken, CLOUD_ROOT)
-                    .filter(CloudRemoteItem::isDirectory)
-                    .map(CloudRemoteItem::name)
+                    .filter { it.isDirectory }
+                    .map { it.name }
                     .distinct()
                     .sorted()
             }
         }
+    }
 
     suspend fun downloadBackup(
         provider: CloudProvider,
@@ -275,7 +276,7 @@ class CloudMirrorRepository(
 
     private suspend fun ensureGoogleFolder(accessToken: String, parentId: String, name: String): CloudRemoteItem {
         val matching = mGoogleDrive.listChildren(accessToken, parentId).filter { it.name == name }
-        val folder = matching.firstOrNull(CloudRemoteItem::isDirectory)
+        val folder = matching.firstOrNull { it.isDirectory }
         matching.filter { it.id != folder?.id }.forEach { mGoogleDrive.deleteItem(accessToken, it.id) }
         return folder ?: mGoogleDrive.createFolder(accessToken, name, parentId)
     }
