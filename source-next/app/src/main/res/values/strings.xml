@@ -572,4 +572,16 @@
     <string name="restore_result_not_processed">Not processed</string>
     <string name="restore_skipped_count">%1$s · %2$d skipped</string>
     <string name="restore_result_counts">%1$s · %2$d failed · %3$d skipped</string>
+
+    <string name="cloud_backup">Cloud backup</string>
+    <string name="sync_google_drive">Sync to Google Drive</string>
+    <string name="sync_onedrive">Sync to OneDrive</string>
+    <string name="cloud_sync_in_progress">Syncing the complete backup directly to cloud storage…</string>
+    <string name="cloud_sync_complete">Cloud sync complete: %1$d files uploaded, %2$d directories checked, %3$d stale remote items removed.</string>
+    <string name="cloud_sync_failed">Cloud sync failed: %1$s</string>
+    <string name="onedrive_setup">Set up OneDrive</string>
+    <string name="microsoft_client_id">Microsoft Entra client ID</string>
+    <string name="onedrive_client_id_desc">Enter the public Android app client ID registered in Microsoft Entra. DataBackup requests only Files.ReadWrite.AppFolder.</string>
+    <string name="onedrive_redirect_uri">Register this redirect URI: %1$s</string>
+    <string name="continue_label">Continue</string>
 </resources>

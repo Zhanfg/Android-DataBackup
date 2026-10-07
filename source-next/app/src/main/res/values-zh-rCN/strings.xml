@@ -557,4 +557,16 @@
     <string name="restore_result_not_processed">未执行</string>
     <string name="restore_skipped_count">%1$s · 跳过 %2$d 项</string>
     <string name="restore_result_counts">%1$s · 失败 %2$d 项 · 跳过 %3$d 项</string>
+
+    <string name="cloud_backup">云端备份</string>
+    <string name="sync_google_drive">同步到 Google Drive</string>
+    <string name="sync_onedrive">同步到 OneDrive</string>
+    <string name="cloud_sync_in_progress">正在通过官方接口直连同步完整备份…</string>
+    <string name="cloud_sync_complete">云端同步完成：上传 %1$d 个文件，检查 %2$d 个目录，清理 %3$d 个远端旧项目。</string>
+    <string name="cloud_sync_failed">云端同步失败：%1$s</string>
+    <string name="onedrive_setup">设置 OneDrive</string>
+    <string name="microsoft_client_id">Microsoft Entra 客户端 ID</string>
+    <string name="onedrive_client_id_desc">填写在 Microsoft Entra 注册的 Android 公共客户端 ID。DataBackup 仅申请 Files.ReadWrite.AppFolder 权限。</string>
+    <string name="onedrive_redirect_uri">注册以下重定向 URI：%1$s</string>
+    <string name="continue_label">继续</string>
 </resources>

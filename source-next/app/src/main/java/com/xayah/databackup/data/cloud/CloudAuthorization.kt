@@ -12,7 +12,6 @@ import com.google.android.gms.tasks.Task
 import com.microsoft.identity.client.AcquireTokenParameters
 import com.microsoft.identity.client.AuthenticationCallback
 import com.microsoft.identity.client.IAuthenticationResult
-import com.microsoft.identity.client.IMultipleAccountPublicClientApplication
 import com.microsoft.identity.client.IPublicClientApplication
 import com.microsoft.identity.client.PublicClientApplication
 import com.microsoft.identity.client.exception.MsalException
@@ -69,7 +68,7 @@ class GoogleDriveAuthorizationClient(context: Context) {
  * redirect URI depend on the final registered Android application/signing certificate.
  */
 class MicrosoftOneDriveAuthorizationClient private constructor(
-    private val mApplication: IMultipleAccountPublicClientApplication,
+    private val mApplication: IPublicClientApplication,
 ) {
     suspend fun acquireToken(activity: Activity): CloudTokenResult =
         suspendCancellableCoroutine { continuation ->
@@ -96,13 +95,19 @@ class MicrosoftOneDriveAuthorizationClient private constructor(
         }
 
     companion object {
-        suspend fun create(context: Context, configResourceId: Int): MicrosoftOneDriveAuthorizationClient =
-            suspendCancellableCoroutine { continuation ->
-                PublicClientApplication.createMultipleAccountPublicClientApplication(
+        const val REDIRECT_URI = "msauth://com.xayah.databackup/auth"
+        private const val AUTHORITY = "https://login.microsoftonline.com/common"
+
+        suspend fun create(context: Context, clientId: String): MicrosoftOneDriveAuthorizationClient {
+            require(clientId.isNotBlank()) { "Microsoft client id must not be blank." }
+            return suspendCancellableCoroutine { continuation ->
+                PublicClientApplication.create(
                     context.applicationContext,
-                    configResourceId,
-                    object : IPublicClientApplication.IMultipleAccountApplicationCreatedListener {
-                        override fun onCreated(application: IMultipleAccountPublicClientApplication) {
+                    clientId.trim(),
+                    AUTHORITY,
+                    REDIRECT_URI,
+                    object : IPublicClientApplication.ApplicationCreatedListener {
+                        override fun onCreated(application: IPublicClientApplication) {
                             if (continuation.isActive) {
                                 continuation.resume(MicrosoftOneDriveAuthorizationClient(application))
                             }
@@ -114,6 +119,7 @@ class MicrosoftOneDriveAuthorizationClient private constructor(
                     },
                 )
             }
+        }
     }
 }
 

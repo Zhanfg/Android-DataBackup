@@ -53,6 +53,20 @@
             android:foregroundServiceType="dataSync" />
 
         <activity
+            android:name="com.microsoft.identity.client.BrowserTabActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="msauth"
+                    android:host="${applicationId}"
+                    android:path="/auth" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".feature.MainActivity"
             android:windowSoftInputMode="adjustResize"
             android:exported="true"
