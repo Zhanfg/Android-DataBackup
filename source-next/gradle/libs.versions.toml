@@ -34,8 +34,8 @@ workRuntimeKtx = "2.11.2"
 compileSdk = "37"
 minSdk = "24"
 targetSdk = "37"
-versionCode = "3501151" # __(API)____(version)_(abi)
-versionName = "3.0.0-preview.2"
+versionCode = "3501152" # __(API)____(version)_(abi)
+versionName = "3.0.0-preview.3"
 ndkVersion = "30.0.16248370"
 cmakeVersion = "3.22.1"
 

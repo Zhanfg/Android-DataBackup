@@ -557,4 +557,12 @@
     <string name="restore_result_not_processed">未执行</string>
     <string name="restore_skipped_count">%1$s · 跳过 %2$d 项</string>
     <string name="restore_result_counts">%1$s · 失败 %2$d 项 · 跳过 %3$d 项</string>
+
+    <string name="automatic_backups">自动备份</string>
+    <string name="schedule_requires_backup">请先创建一个备份配置，再启用自动备份。</string>
+    <string name="schedule_daily_summary">每天约 03:00 · %1$s</string>
+    <string name="schedule_execution">执行策略</string>
+    <string name="schedule_execution_desc">Android WorkManager 可能会为省电而推迟 03:00 的任务。每个备份配置都会作为独立的前台数据同步任务运行。</string>
+    <string name="scheduled_backup_running">计划备份</string>
+    <string name="restore_safety_desc">恢复前会校验目标位置；如果操作被中断，已经恢复的数据会保留。</string>
 </resources>

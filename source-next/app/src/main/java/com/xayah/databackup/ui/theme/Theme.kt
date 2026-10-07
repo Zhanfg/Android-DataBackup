@@ -10,10 +10,16 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import com.xayah.databackup.ui.theme.color.hct.Hct
+import com.xayah.databackup.util.AppThemeMode
+import com.xayah.databackup.util.AppThemeModeSetting
+import com.xayah.databackup.util.DynamicColor
+import com.xayah.databackup.util.readBoolean
+import com.xayah.databackup.util.readEnum
 import com.xayah.databackup.ui.theme.color.scheme.SchemeContent
 
 private val DarkColorScheme = darkColorScheme(
@@ -40,18 +46,28 @@ private val LightColorScheme = lightColorScheme(
 
 @Composable
 fun DataBackupTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean? = null,
+    dynamicColor: Boolean? = null,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val savedThemeMode by context.readEnum<AppThemeMode>(AppThemeModeSetting)
+        .collectAsStateWithLifecycle(initialValue = AppThemeModeSetting.second)
+    val savedDynamicColor by context.readBoolean(DynamicColor)
+        .collectAsStateWithLifecycle(initialValue = DynamicColor.second)
+    val effectiveDarkTheme = darkTheme ?: when (savedThemeMode) {
+        AppThemeMode.SYSTEM -> isSystemInDarkTheme()
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+    }
+    val effectiveDynamicColor = dynamicColor ?: savedDynamicColor
+
     val materialColorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        effectiveDynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (effectiveDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColorScheme
+        effectiveDarkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
 

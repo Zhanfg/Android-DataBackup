@@ -23,6 +23,12 @@ enum class SortsSequence {
     DESCENDING
 }
 
+enum class AppThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
+}
+
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 suspend fun Context.preloadingDataStore() = dataStore.data.first()
 
@@ -81,6 +87,18 @@ const val DefSortsSelectedFirstBackup = false
 val SortsSelectedFirstBackup = Pair(KeySortsSelectedFirstBackup, DefSortsSelectedFirstBackup)
 
 // ----------------------------------------------------------------------------------------------------------------------------Settings
+
+val KeyAppThemeMode = stringPreferencesKey("app_theme_mode")
+val DefAppThemeMode = AppThemeMode.SYSTEM
+val AppThemeModeSetting = Pair(KeyAppThemeMode, DefAppThemeMode)
+
+val KeyDynamicColor = booleanPreferencesKey("dynamic_color")
+const val DefDynamicColor = true
+val DynamicColor = Pair(KeyDynamicColor, DefDynamicColor)
+
+val KeyScheduledBackupUuids = stringPreferencesKey("scheduled_backup_uuids")
+const val DefScheduledBackupUuids = ""
+val ScheduledBackupUuids = Pair(KeyScheduledBackupUuids, DefScheduledBackupUuids)
 
 val KeyAutoScreenOff = booleanPreferencesKey("auto_screen_off")
 const val DefAutoScreenOff = true

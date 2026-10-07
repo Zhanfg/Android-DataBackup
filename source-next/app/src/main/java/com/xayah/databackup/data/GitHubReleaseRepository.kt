@@ -18,8 +18,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.Closeable
+import com.xayah.databackup.util.ProjectLinks
 
-private const val BASE_URL = "https://api.github.com/repos/XayahSuSuSu/Android-DataBackup/"
+private const val BASE_URL = ProjectLinks.GITHUB_API_BASE
 
 enum class GitHubApiErrorKind {
     RATE_LIMITED,

@@ -9,6 +9,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import com.xayah.databackup.data.AppRepository
 import com.xayah.databackup.data.ArchiveBackupProcessRepository
 import com.xayah.databackup.data.BackupConfigRepository
+import com.xayah.databackup.data.BackupScheduleRepository
 import com.xayah.databackup.data.BackupSelectionRepository
 import com.xayah.databackup.data.CallLogRepository
 import com.xayah.databackup.data.ContactRepository
@@ -40,6 +41,7 @@ import com.xayah.databackup.feature.backup.networks.NetworksViewModel
 import com.xayah.databackup.feature.backup.rustic.RusticBackupProcessViewModel
 import com.xayah.databackup.feature.dashboard.DashboardViewModel
 import com.xayah.databackup.feature.restore.RestoreProcessViewModel
+import com.xayah.databackup.feature.schedule.ScheduleViewModel
 import com.xayah.databackup.feature.restore.RestoreSetupViewModel
 import com.xayah.databackup.feature.restore.RestoreViewModel
 import com.xayah.databackup.feature.update.UpdatesViewModel
@@ -77,6 +79,7 @@ class App : Application(), SingletonImageLoader.Factory {
         factory { RestoreRepository(get(), get()) }
 
         singleOf(::BackupConfigRepository)
+        singleOf(::BackupScheduleRepository)
         singleOf(::AppRepository)
         singleOf(::FileRepository)
         singleOf(::NetworkRepository)
@@ -107,6 +110,7 @@ class App : Application(), SingletonImageLoader.Factory {
         singleOf(::RusticRestoreHelper) { bind<RestoreHelper>() }
 
         viewModelOf(::DashboardViewModel)
+        viewModelOf(::ScheduleViewModel)
         viewModelOf(::BackupSetupViewModel)
         viewModelOf(::BackupLibraryViewModel)
         viewModelOf(::NewBackupViewModel)

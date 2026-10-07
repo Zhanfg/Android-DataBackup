@@ -46,13 +46,14 @@ import com.xayah.databackup.ui.component.surfaceTopAppBarColors
 import com.xayah.databackup.ui.component.verticalFadingEdges
 import com.xayah.databackup.ui.theme.primaryContainerLow
 import com.xayah.databackup.util.Navigator
+import com.xayah.databackup.util.ProjectLinks
 import com.xayah.databackup.util.navigateSafely
 import com.xayah.databackup.util.openUrl
 import com.xayah.databackup.util.popBackStackSafely
 
-private const val GitHubUrl = "https://github.com/XayahSuSuSu/Android-DataBackup"
-private const val DocsUrl = "https://DataBackupOfficial.github.io"
-private const val ContactUrl = "https://t.me/databackupchat"
+private const val GitHubUrl = ProjectLinks.REPOSITORY_URL
+private const val DocsUrl = ProjectLinks.DOCS_URL
+private const val ContactUrl = ProjectLinks.ISSUES_URL
 
 @Composable
 fun AboutScreen(navigator: Navigator) {
