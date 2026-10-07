@@ -70,6 +70,18 @@ jobs:
       - name: Assemble debug
         run: ./gradlew :app:assembleDebug --stacktrace
 
+      - name: Report binary sizes
+        run: |
+          du -h app/build/outputs/apk/debug/*.apk || true
+          find app/build -type f -name '*.so' -exec du -h {} + | sort -h || true
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DataBackup-3.x-debug
+          if-no-files-found: error
+          path: source-next/app/build/outputs/apk/debug/*.apk
+
       - name: Rustic tests
         run: cargo test --manifest-path native/src/main/jni/rustic/Cargo.toml
 
