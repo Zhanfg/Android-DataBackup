@@ -5,7 +5,7 @@ use opendal::{
     services::Gdrive,
 };
 use rustic_core::{
-    ALL_FILE_TYPES, BytesList, ConfigOptions, Credentials, ErrorKind, FileType, Id, KeyOptions,
+    ALL_FILE_TYPES, ConfigOptions, Credentials, ErrorKind, FileType, Id, KeyOptions,
     ReadBackend, Repository, RepositoryBackends, RepositoryOptions, RusticError, RusticResult,
     WriteBackend,
 };
@@ -54,6 +54,7 @@ impl GdriveBackend {
 
     fn path(tpe: FileType, id: &Id) -> String {
         let hex = id.to_hex();
+        let hex = hex.as_str();
         if tpe == FileType::Config {
             "config".to_string()
         } else if tpe == FileType::Pack {
@@ -170,11 +171,11 @@ impl WriteBackend for GdriveBackend {
         tpe: FileType,
         id: &Id,
         _cacheable: bool,
-        content: BytesList,
+        content: bytes::Bytes,
     ) -> RusticResult<()> {
         self.ensure_pack_parent(tpe, id)?;
         let path = Self::path(tpe, id);
-        self.operator.write(&path, content.into_vec()).map_err(|error| {
+        self.operator.write(&path, content).map_err(|error| {
             RusticError::with_source(ErrorKind::Backend, "Writing Google Drive repository object failed", error)
         })?;
         Ok(())
