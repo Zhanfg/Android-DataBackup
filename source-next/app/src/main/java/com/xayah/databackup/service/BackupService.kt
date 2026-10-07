@@ -130,6 +130,7 @@ object BackupService {
                 setupBackupConfig()
             } catch (e: CancellationException) {
                 LogHelper.i(TAG, "start", "Backup pipeline canceled and exited early: ${e.message}")
+                throw e
             }
         }
     }
