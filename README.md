@@ -6,10 +6,10 @@
 
 <h1 align="center">DataBackup</h1>
 
-[![Doc](https://img.shields.io/badge/wiki-documentation-forestgreen)](https://DataBackupOfficial.github.io)
-[![Download](https://img.shields.io/github/downloads/XayahSuSuSu/Android-DataBackup/total)](https://github.com/XayahSuSuSu/Android-DataBackup/releases)
-[![GitHub release](https://img.shields.io/github/v/release/XayahSuSuSu/Android-DataBackup?color=orange)](https://github.com/XayahSuSuSu/Android-DataBackup/releases)
-[![License](https://img.shields.io/github/license/XayahSuSuSu/Android-DataBackup?color=ff69b4)](./LICENSE)
+[![Doc](https://img.shields.io/badge/wiki-documentation-forestgreen)](https://github.com/Zhanfg/Android-DataBackup#readme)
+[![Download](https://img.shields.io/github/downloads/Zhanfg/Android-DataBackup/total)](https://github.com/Zhanfg/Android-DataBackup/releases)
+[![GitHub release](https://img.shields.io/github/v/release/Zhanfg/Android-DataBackup?color=orange)](https://github.com/Zhanfg/Android-DataBackup/releases)
+[![License](https://img.shields.io/github/license/Zhanfg/Android-DataBackup?color=ff69b4)](./LICENSE)
 [![Channel](https://img.shields.io/badge/channel-DataBackup-252850?color=blue&logo=telegram)](https://t.me/dabackupchannel)
 [![Chat](https://img.shields.io/badge/group-DataBackup-252850?color=blue&logo=telegram)](https://t.me/databackupchat)
 [![Translation](https://hosted.weblate.org/widget/databackup/svg-badge.svg)](https://hosted.weblate.org/engage/databackup/)
@@ -28,7 +28,7 @@ Free and open-source data backup application
 :sparkling_heart: This application was born **with the consent of the author**.
 
 ## Usage
-See [documentation](https://DataBackupOfficial.github.io).
+See [documentation](https://github.com/Zhanfg/Android-DataBackup#readme).
 
 ## Features
 * :deciduous_tree: **Root needed, support [Magisk](https://github.com/topjohnwu/Magisk), [KernelSU](https://github.com/tiann/KernelSU), [APatch](https://github.com/bmax121/APatch)**
@@ -58,7 +58,7 @@ See [documentation](https://DataBackupOfficial.github.io).
     alt="Get it on F-Droid"
     height="80">](https://f-droid.org/zh_Hans/packages/com.xayah.databackup.foss/)
 
-or get the APK from the [Releases](https://github.com/XayahSuSuSu/Android-DataBackup/releases/latest).
+or get the APK from the [Releases](https://github.com/Zhanfg/Android-DataBackup/releases/latest).
 
 ## Translation
 [<img src="https://hosted.weblate.org/widget/databackup/main/open-graph.png"
@@ -67,24 +67,24 @@ or get the APK from the [Releases](https://github.com/XayahSuSuSu/Android-DataBa
 ## Contributors
 Thanks to all these wonderful people!
 
-[![Contributors](https://contrib.rocks/image?repo=XayahSuSuSu/Android-DataBackup)](https://github.com/XayahSuSuSu/Android-DataBackup/graphs/contributors)
+[![Contributors](https://contrib.rocks/image?repo=Zhanfg/Android-DataBackup)](https://github.com/Zhanfg/Android-DataBackup/graphs/contributors)
 
 ## Support
 If you enjoy this app and want to help it become better, feel free to sponsor me!
 
 <!-- [<img src="./docs/static/img/bmc-button.svg"
      alt="Buy Me a Coffee"
-     height="60">](https://www.buymeacoffee.com/XayahSuSuSu)[<img src="./docs/static/img/afdian.svg"
+     height="60">](https://github.com/Zhanfg/Android-DataBackup)[<img src="./docs/static/img/afdian.svg"
      alt=爱发电
-     height="60">](https://afdian.net/a/XayahSuSuSu) -->
+     height="60">](https://github.com/Zhanfg/Android-DataBackup) -->
 
 [<img src="./docs/static/img/pp_h_rgb.svg"
      alt="PayPal"
-     height="60">](https://paypal.me/XayahSuSuSu)
+     height="60">](https://github.com/Zhanfg/Android-DataBackup)
 
 [<img src="./docs/static/img/afdian.svg"
      alt=爱发电
-     height="60">](https://afdian.net/a/XayahSuSuSu)
+     height="60">](https://github.com/Zhanfg/Android-DataBackup)
 
 ## LICENSE
 [GNU General Public License v3.0](./LICENSE)
