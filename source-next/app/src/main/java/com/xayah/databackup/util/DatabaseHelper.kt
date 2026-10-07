@@ -9,7 +9,9 @@ object DatabaseHelper {
         App.application,
         AppDatabase::class.java,
         "database-databackup"
-    ).build()
+    )
+        .addMigrations(AppDatabase.MIGRATION_1_2)
+        .build()
 
     val appDao = mDatabase.appDao()
     val networkDao = mDatabase.networkDao()
