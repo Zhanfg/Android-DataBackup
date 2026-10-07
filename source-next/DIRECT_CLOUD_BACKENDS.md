@@ -93,7 +93,7 @@ Archive should use the direct REST transport. Rustic should ultimately consume t
 2. Google Drive direct REST backend.
 3. OneDrive direct App Folder backend.
 4. Persistent transfer journal plus list/range-download primitives. **Implemented on `maint/3.x`.**
-5. Google AuthorizationClient and Microsoft MSAL account flows.
+5. Google `AuthorizationClient` and Microsoft MSAL 8.x adapters. **Code implemented; final OAuth app registration/client IDs are still required.**
 6. Slim Rustic/OpenDAL `gdrive` + `onedrive` backend.
 7. UI destination picker and end-to-end upload/download/restore tests.
 

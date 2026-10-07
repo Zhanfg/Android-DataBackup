@@ -82,6 +82,10 @@ dependencies {
     // JSON serialization
     implementation(libs.kotlinx.serialization.json)
 
+    // Cloud authorization
+    implementation(libs.google.play.services.auth)
+    implementation(libs.msal)
+
     // Ktor
     implementation(libs.ktor.client.android)
     implementation(libs.ktor.client.cio)

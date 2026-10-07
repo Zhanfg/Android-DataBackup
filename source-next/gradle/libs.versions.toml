@@ -19,6 +19,8 @@ kotlin = "2.3.10"
 kotlin-ksp = "2.3.10" # https://github.com/google/ksp/releases
 kotlinxSerializationJson = "1.11.0"
 ktor = "3.5.1"
+googlePlayServicesAuth = "22.0.0"
+msal = "8.4.1"
 libsu = "6.0.0"
 lifecycleRuntimeKtx = "2.11.0"
 material3 = "1.5.0-alpha23"
@@ -68,6 +70,8 @@ arrow-optics-ksp-plugin = { module = "io.arrow-kt:arrow-optics-ksp-plugin", vers
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coilCompose" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+google-play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "googlePlayServicesAuth" }
+msal = { module = "com.microsoft.identity.client:msal", version.ref = "msal" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 koin-androidx-compose = { module = "io.insert-koin:koin-androidx-compose", version.ref = "koinAndroidxCompose" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
