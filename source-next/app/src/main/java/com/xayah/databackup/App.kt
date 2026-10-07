@@ -55,6 +55,7 @@ import com.xayah.databackup.service.backup.archive.BackupNetworksHelper
 import com.xayah.databackup.service.backup.rustic.RusticBackupSourceHelper
 import com.xayah.databackup.service.restore.RestoreHelper
 import com.xayah.databackup.service.restore.rustic.RusticRestoreHelper
+import com.xayah.databackup.util.NotificationHelper
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import org.koin.android.ext.koin.androidContext
@@ -137,6 +138,8 @@ class App : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         application = this
+        // Workers can be started by WorkManager before MainActivity ever runs after a reboot.
+        NotificationHelper.createChannelIfNecessary(this)
 
         startKoin {
             androidLogger()
