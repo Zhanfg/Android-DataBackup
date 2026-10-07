@@ -261,10 +261,16 @@ private fun UpdateOverviewCard(
                     }
 
                     UpdateActionButton(
-                        enabled = checkingUpdates.not() && updateAvailable.not(),
+                        enabled = checkingUpdates.not(),
                         containerColor = buttonContainerColor,
                         actionText = actionText,
-                        onClick = onCheckUpdates,
+                        onClick = {
+                            if (updateAvailable) {
+                                context.openUrl(ProjectLinks.RELEASES_URL)
+                            } else {
+                                onCheckUpdates()
+                            }
+                        },
                     )
                 }
             }
