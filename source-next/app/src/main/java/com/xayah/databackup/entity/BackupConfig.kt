@@ -11,8 +11,10 @@ import kotlin.uuid.Uuid
 sealed class BackupBackend {
     @JsonClass(generateAdapter = true)
     data class Rustic(
-        val password: String = DEFAULT_PASSWORD,
-    ) : BackupBackend()
+        @Json(ignore = true) val password: String = DEFAULT_PASSWORD,
+    ) : BackupBackend() {
+        override fun toString(): String = "Rustic(password=<redacted>)"
+    }
 
     companion object {
         const val DEFAULT_PASSWORD = "anonymous"
