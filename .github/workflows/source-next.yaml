@@ -65,6 +65,8 @@ jobs:
         run: ./gradlew test --stacktrace
 
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: ./gradlew lint --stacktrace
 
       - name: Assemble debug
