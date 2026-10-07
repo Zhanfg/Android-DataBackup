@@ -18,8 +18,8 @@ This repository is a multi-module Android project managed with Gradle Kotlin DSL
 - `native/`: JNI/CMake native layer plus Kotlin bindings (`src/main/jni`, `src/main/kotlin`).
 - `gradle/libs.versions.toml`: centralized dependency and SDK versions.
 
-Source code lives under each module’s `src/main`. Temporary JVM tests may use `src/test`, and temporary instrumentation tests may use
-`src/androidTest`; remove their classes and dedicated fixtures before delivery.
+Source code lives under each module’s `src/main`. JVM regression tests live under `src/test`, and instrumentation/root integration tests
+live under `src/androidTest`. Keep durable regression coverage for backup formats, restore safety, JNI contracts, cancellation and migrations.
 
 ## Architecture & Responsibilities
 Organize code by responsibility and use business-oriented names. Use Flow for observable state, Arrow optics for nested state updates,
@@ -91,17 +91,17 @@ Use the Gradle wrapper from repository root:
   Record unrelated defects separately instead of mixing behavior changes into a structural refactor.
 
 ## Testing Guidelines
-- Test classes are temporary verification tools only. After verification passes, remove them and their dedicated fixtures and helpers before
-  delivery. Do not retain test classes in the final source tree or commits, including example tests and temporary test classes in production packages.
-- Keep a concise record of the checks and results. If a check fails or cannot run, record the unresolved limitation; cleanup does not mean it passed.
-- Temporary JVM tests use JUnit4; temporary instrumentation tests use AndroidX JUnit/Espresso.
-- Create temporary tests when changing backup logic, root-service behavior, database models, or JNI boundaries.
+- Regression tests are production engineering assets. Keep tests that protect backup formats, restore safety, database migrations, root-service
+  behavior, JNI boundaries, cancellation/cleanup, credential handling, and compatibility contracts.
+- Keep a concise record of the checks and results. If a check fails or cannot run, record the unresolved limitation; skipped checks do not count as passes.
+- JVM tests use JUnit4; instrumentation tests use AndroidX JUnit/Espresso.
+- Add or update durable tests when changing backup logic, root-service behavior, database models, security boundaries, or JNI contracts.
 - Prefer module-scoped test runs while iterating (example: `./gradlew :native:testDebugUnitTest`).
 - Before moving backup/restore logic, cover format compatibility, category/app-part selection, request generation and one-time consumption,
   session isolation, cancellation, progress/results, cache invalidation, source mapping, and cleanup where affected.
 - Run module unit tests, `assembleDebug`, lint, and the Rust tests after cross-layer changes. JNI renames also require Native instrumentation
   tests when a device is available. Test destructive restore workflows only with disposable test data/devices.
-- Temporary Root integration tests require an authorized debug app on a rooted test device. Do not count unavailable or skipped checks as passes.
+- Root integration tests require an authorized debug app on a rooted disposable test device. Do not count unavailable or skipped checks as passes.
 - Preserve screen layout and navigation behavior during package moves. Check affected screen previews/navigation and report unavailable device
   or screenshot validation explicitly; a successful compilation is not evidence of a device restore round trip.
 
