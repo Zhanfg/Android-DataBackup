@@ -4,6 +4,9 @@ import androidx.lifecycle.viewModelScope
 import arrow.optics.copy
 import com.xayah.databackup.data.BackupConfigRepository
 import com.xayah.databackup.data.RusticRepository
+import com.xayah.databackup.data.cloud.CloudMirrorRepository
+import com.xayah.databackup.data.cloud.CloudMirrorStats
+import com.xayah.databackup.data.cloud.CloudProvider
 import com.xayah.databackup.entity.BackupBackend
 import com.xayah.databackup.entity.BackupConfig
 import com.xayah.databackup.entity.name
@@ -27,10 +30,18 @@ data class BackupSnapshotsState(
     val hasError: Boolean = false,
 )
 
+data class CloudSyncUiState(
+    val provider: CloudProvider? = null,
+    val isRunning: Boolean = false,
+    val stats: CloudMirrorStats? = null,
+    val error: String? = null,
+)
+
 open class BackupConfigViewModel(
     private val mRoute: BackupConfigRoute,
     private val mBackupConfigRepo: BackupConfigRepository,
     private val mRusticRepo: RusticRepository,
+    private val mCloudMirrorRepo: CloudMirrorRepository,
 ) : BaseViewModel() {
     companion object {
         private val mSharingStarted = SharingStarted.WhileSubscribed(5_000)
@@ -51,10 +62,45 @@ open class BackupConfigViewModel(
     private val _snapshots = MutableStateFlow(BackupSnapshotsState())
     val snapshots: StateFlow<BackupSnapshotsState> = _snapshots.asStateFlow()
 
+    private val _cloudSync = MutableStateFlow(CloudSyncUiState())
+    val cloudSync: StateFlow<CloudSyncUiState> = _cloudSync.asStateFlow()
+
     private val _deletingSnapshot = MutableStateFlow(false)
     val deletingSnapshot: StateFlow<Boolean> = _deletingSnapshot.asStateFlow()
     private val _snapshotDeleteFailed = MutableStateFlow(false)
     val snapshotDeleteFailed: StateFlow<Boolean> = _snapshotDeleteFailed.asStateFlow()
+
+    fun syncBackupToCloud(provider: CloudProvider, accessToken: String) {
+        if (_cloudSync.value.isRunning) return
+        val config = mCurrentConfig ?: return
+        _cloudSync.value = CloudSyncUiState(provider = provider, isRunning = true)
+        withLock(Dispatchers.IO) {
+            try {
+                val stats = mCloudMirrorRepo.uploadBackup(provider, accessToken, config)
+                _cloudSync.value = CloudSyncUiState(provider = provider, stats = stats)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _cloudSync.value = CloudSyncUiState(
+                    provider = provider,
+                    error = error.message ?: error::class.java.simpleName,
+                )
+            }
+        }
+    }
+
+    fun reportCloudAuthError(provider: CloudProvider, error: Throwable?) {
+        _cloudSync.value = CloudSyncUiState(
+            provider = provider,
+            error = error?.message ?: "Cloud authorization was cancelled.",
+        )
+    }
+
+    fun clearCloudSyncState() {
+        if (!_cloudSync.value.isRunning) {
+            _cloudSync.value = CloudSyncUiState()
+        }
+    }
 
     fun clearSnapshotDeleteError() {
         _snapshotDeleteFailed.value = false

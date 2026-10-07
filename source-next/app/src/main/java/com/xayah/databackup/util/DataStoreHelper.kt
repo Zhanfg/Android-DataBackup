@@ -115,3 +115,10 @@ val MessagesOptionSelectedBackup = Pair(KeyMessagesOptionSelectedBackup, DefMess
 val KeyBackupConfigSelectedUuid = stringPreferencesKey("backup_config_selected_uuid")
 const val DefBackupConfigSelectedUuid = ""
 val BackupConfigSelectedUuid = Pair(KeyBackupConfigSelectedUuid, DefBackupConfigSelectedUuid)
+
+
+// ----------------------------------------------------------------------------------------------------------------------------Cloud
+
+val KeyMicrosoftOneDriveClientId = stringPreferencesKey("microsoft_onedrive_client_id")
+const val DefMicrosoftOneDriveClientId = ""
+val MicrosoftOneDriveClientId = Pair(KeyMicrosoftOneDriveClientId, DefMicrosoftOneDriveClientId)
