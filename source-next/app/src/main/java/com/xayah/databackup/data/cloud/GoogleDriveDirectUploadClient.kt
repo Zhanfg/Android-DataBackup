@@ -27,6 +27,11 @@ import java.io.Closeable
  * File bytes are sent directly to Google's resumable upload endpoint.
  */
 class GoogleDriveDirectUploadClient : Closeable {
+    companion object {
+        const val CHUNK_GRANULARITY = 256 * 1024
+        const val DEFAULT_CHUNK_SIZE = 20 * CHUNK_GRANULARITY // 5 MiB
+    }
+
     private val mClient = HttpClient(CIO) {
         expectSuccess = false
         install(HttpTimeout) {
@@ -78,6 +83,12 @@ class GoogleDriveDirectUploadClient : Closeable {
         bytes: ByteArray,
     ): DirectUploadProgress {
         validateUploadChunk(offset, totalBytes, bytes)
+        val isFinal = offset + bytes.size == totalBytes
+        if (!isFinal) {
+            require(bytes.size % CHUNK_GRANULARITY == 0) {
+                "Google Drive non-final chunks must be multiples of 256 KiB."
+            }
+        }
         val end = offset + bytes.size - 1
         val response = mClient.put(session.uploadUrl) {
             header(HttpHeaders.ContentLength, bytes.size)
