@@ -45,7 +45,8 @@ data class App(
         }
 
     val isSystemApp: Boolean
-        get() = (info.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        get() = info.isSystemTrusted ||
+                (info.flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
 
     val isSelected: Boolean
         get() = option.apk || option.internalData || option.externalData || option.additionalData
@@ -129,6 +130,7 @@ data class Info(
     @ColumnInfo(defaultValue = "") var versionName: String = "",
     @ColumnInfo(defaultValue = "0") var versionCode: Long = 0,
     @ColumnInfo(defaultValue = "0") var flags: Int = 0,
+    @ColumnInfo(defaultValue = "0") var isSystemTrusted: Boolean = false,
     @ColumnInfo(defaultValue = "0") var firstInstallTime: Long = 0,
     @ColumnInfo(defaultValue = "0") var lastUpdateTime: Long = 0,
 ) : Parcelable {
@@ -138,6 +140,7 @@ data class Info(
         versionName = parcel.readString() ?: "",
         versionCode = parcel.readLong(),
         flags = parcel.readInt(),
+        isSystemTrusted = parcel.readInt() != 0,
         firstInstallTime = parcel.readLong(),
         lastUpdateTime = parcel.readLong()
     )
@@ -150,6 +153,7 @@ data class Info(
         dest.writeString(versionName)
         dest.writeLong(versionCode)
         dest.writeInt(this.flags)
+        dest.writeInt(if (isSystemTrusted) 1 else 0)
         dest.writeLong(firstInstallTime)
         dest.writeLong(lastUpdateTime)
     }
