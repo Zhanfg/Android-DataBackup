@@ -1,0 +1,82 @@
+name: Source Next CI
+
+on:
+  push:
+    branches:
+      - maint/3.x
+    paths:
+      - 'source-next/**'
+      - '.gitmodules'
+      - '.github/workflows/source-next.yaml'
+  pull_request:
+    paths:
+      - 'source-next/**'
+      - '.gitmodules'
+      - '.github/workflows/source-next.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-next-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify DataBackup 3.x
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    defaults:
+      run:
+        working-directory: source-next
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install native toolchain
+        run: sdkmanager "ndk;30.0.16248370" "cmake;3.22.1"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew test --stacktrace
+
+      - name: Lint
+        run: ./gradlew lint --stacktrace
+
+      - name: Assemble debug
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Rustic tests
+        run: cargo test --locked --manifest-path native/src/main/jni/rustic/Cargo.toml
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-next-reports
+          if-no-files-found: ignore
+          path: |
+            source-next/**/build/reports/**
+            source-next/**/build/test-results/**
