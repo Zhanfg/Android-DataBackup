@@ -5,6 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
@@ -128,6 +129,17 @@ class OneDriveDirectUploadClient : Closeable {
             throw DirectCloudException(response.status.value, "OneDrive range download failed.")
         }
         return response.body()
+    }
+
+    suspend fun deleteItem(accessToken: String, itemId: String) {
+        require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
+        require(itemId.isNotBlank()) { "Missing OneDrive item id." }
+        val response = mClient.delete("https://graph.microsoft.com/v1.0/me/drive/items/$itemId") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+        }
+        if (response.status.value != 204 && response.status.value != 404) {
+            throw DirectCloudException(response.status.value, "OneDrive delete failed.")
+        }
     }
 
     suspend fun createSession(

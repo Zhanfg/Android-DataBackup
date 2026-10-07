@@ -14,6 +14,7 @@ class DirectCloudTransferRepository(
         localPath: String,
         parentId: String?,
         fileName: String,
+        existingFileId: String? = null,
         transferId: String = UUID.randomUUID().toString(),
     ): String {
         val totalBytes = fileSize(localPath)
@@ -22,6 +23,7 @@ class DirectCloudTransferRepository(
             fileName = fileName,
             totalBytes = totalBytes,
             parentId = parentId,
+            existingFileId = existingFileId,
         )
         mJournal.start(
             id = transferId,

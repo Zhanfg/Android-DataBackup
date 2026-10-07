@@ -4,9 +4,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -128,11 +130,23 @@ class GoogleDriveDirectUploadClient : Closeable {
         return response.body()
     }
 
+    suspend fun deleteItem(accessToken: String, fileId: String) {
+        require(accessToken.isNotBlank()) { "Missing Google access token." }
+        require(fileId.isNotBlank()) { "Missing Drive file id." }
+        val response = mClient.delete("https://www.googleapis.com/drive/v3/files/$fileId") {
+            header(HttpHeaders.Authorization, "Bearer $accessToken")
+        }
+        if (response.status.value != 204 && response.status.value != 404) {
+            throw DirectCloudException(response.status.value, "Google Drive delete failed.")
+        }
+    }
+
     suspend fun createSession(
         accessToken: String,
         fileName: String,
         totalBytes: Long,
         parentId: String? = null,
+        existingFileId: String? = null,
         mimeType: String = "application/octet-stream",
     ): DirectUploadSession {
         require(accessToken.isNotBlank()) { "Missing Google access token." }
@@ -141,17 +155,33 @@ class GoogleDriveDirectUploadClient : Closeable {
 
         val metadata = buildJsonObject {
             put("name", fileName)
-            parentId?.takeIf(String::isNotBlank)?.let { parent ->
-                put("parents", buildJsonArray { add(parent) })
+            if (existingFileId == null) {
+                parentId?.takeIf(String::isNotBlank)?.let { parent ->
+                    put("parents", buildJsonArray { add(parent) })
+                }
             }
         }
-        val response = mClient.post("https://www.googleapis.com/upload/drive/v3/files") {
-            parameter("uploadType", "resumable")
-            header(HttpHeaders.Authorization, "Bearer $accessToken")
-            header("X-Upload-Content-Type", mimeType)
-            header("X-Upload-Content-Length", totalBytes)
-            contentType(ContentType.Application.Json)
-            setBody(metadata.toString())
+        val uploadEndpoint = existingFileId
+            ?.let { "https://www.googleapis.com/upload/drive/v3/files/$it" }
+            ?: "https://www.googleapis.com/upload/drive/v3/files"
+        val response = if (existingFileId == null) {
+            mClient.post(uploadEndpoint) {
+                parameter("uploadType", "resumable")
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+                header("X-Upload-Content-Type", mimeType)
+                header("X-Upload-Content-Length", totalBytes)
+                contentType(ContentType.Application.Json)
+                setBody(metadata.toString())
+            }
+        } else {
+            mClient.patch(uploadEndpoint) {
+                parameter("uploadType", "resumable")
+                header(HttpHeaders.Authorization, "Bearer $accessToken")
+                header("X-Upload-Content-Type", mimeType)
+                header("X-Upload-Content-Length", totalBytes)
+                contentType(ContentType.Application.Json)
+                setBody(metadata.toString())
+            }
         }
         if (!response.status.isSuccess()) {
             throw DirectCloudException(response.status.value, "Google Drive upload-session creation failed.")

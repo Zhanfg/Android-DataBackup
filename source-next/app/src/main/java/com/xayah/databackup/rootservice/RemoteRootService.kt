@@ -317,6 +317,20 @@ object RemoteRootService {
             return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
         }
 
+        override fun openWriteTruncate(path: String): ParcelFileDescriptor {
+            val file = File(path)
+            require(file.isDirectory.not()) { "Cannot open a directory for writing: $path" }
+            file.parentFile?.let { parent ->
+                check(parent.exists() || parent.mkdirs()) { "Failed to create parent directory: ${parent.path}" }
+            }
+            return ParcelFileDescriptor.open(
+                file,
+                ParcelFileDescriptor.MODE_CREATE or
+                        ParcelFileDescriptor.MODE_TRUNCATE or
+                        ParcelFileDescriptor.MODE_WRITE_ONLY,
+            )
+        }
+
         override fun writeText(path: String, pfd: ParcelFileDescriptor) {
             var text = ""
             readFromParcel(pfd) { parcel -> parcel.readString()?.also { text = it } }
@@ -764,6 +778,9 @@ object RemoteRootService {
     suspend fun openReadOnly(path: String): ParcelFileDescriptor? =
         getService()?.openReadOnly(path)
 
+    suspend fun openWriteTruncate(path: String): ParcelFileDescriptor? =
+        getService()?.openWriteTruncate(path)
+
     suspend fun writeText(path: String, text: String) {
         getService()?.writeText(
             path,
@@ -998,51 +1015,3 @@ object RemoteRootService {
     internal suspend fun restoreRusticMessages(
         repositoryPath: String,
         password: String,
-        snapshotId: String,
-        messageIds: List<String>,
-        callback: RestoreProgressCallback,
-    ): List<String> = withContext(Dispatchers.IO) {
-        requireFullSnapshotId(snapshotId)
-        require(messageIds.isNotEmpty()) { "No messages selected" }
-        val service = checkNotNull(getService()) { "Root service is unavailable" }
-        service.restoreRusticMessages(repositoryPath, password, snapshotId, messageIds, callback.asBinderCallback())
-    }
-
-    /**
-     * Replaces selected CE/DE internal data directly in an installed app's system-created directories.
-     * sourceUserId and internalDataPaths come from the manifest's app userId and included internal data paths.
-     * userId identifies the destination user; source paths follow the same PathHelper rules as backup.
-     * Requires a full snapshot ID; CE storage must be unlocked when selected.
-     * Leaves the app stopped. Failure may leave partial data; there is no staging or rollback.
-     */
-    suspend fun restoreRusticAppInternalData(
-        repositoryPath: String,
-        password: String,
-        snapshotId: String,
-        packageName: String,
-        userId: Int,
-        sourceUserId: Int,
-        internalDataPaths: List<String>,
-    ) = withContext(Dispatchers.IO) {
-        val service = checkNotNull(getService()) { "Root service is unavailable" }
-        service.restoreRusticAppInternalData(repositoryPath, password, snapshotId, packageName, userId, sourceUserId, internalDataPaths)
-    }
-
-    /**
-     * Replaces selected primary-storage Android/data, Android/obb and Android/media contents.
-     * Requires an installed, non-persistent app and unlocked target user. Leaves the app stopped.
-     * Uses source-user paths from the snapshot; failures can leave partial data (no rollback).
-     */
-    suspend fun restoreRusticAppExternalData(
-        repositoryPath: String,
-        password: String,
-        snapshotId: String,
-        packageName: String,
-        userId: Int,
-        sourceUserId: Int,
-        externalDataPaths: List<String>,
-    ) = withContext(Dispatchers.IO) {
-        val service = checkNotNull(getService()) { "Root service is unavailable" }
-        service.restoreRusticAppExternalData(repositoryPath, password, snapshotId, packageName, userId, sourceUserId, externalDataPaths)
-    }
-}
