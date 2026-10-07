@@ -61,6 +61,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Maintained project identity guard
+        run: |
+          grep -q 'Zhanfg/Android-DataBackup' app/src/main/java/com/xayah/databackup/util/ProjectLinks.kt
+          ! grep -R --line-number --fixed-strings 'XayahSuSuSu/Android-DataBackup' app/src/main/java
+
       - name: RootService startup dependency guard
         run: |
           ! grep -q "initAndroidTls" app/src/main/java/com/xayah/databackup/rootservice/RemoteRootService.kt
