@@ -8,12 +8,16 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
 import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentType
 import kotlinx.serialization.json.Json
@@ -117,18 +121,33 @@ class OneDriveDirectUploadClient : Closeable {
         )
     }
 
-    suspend fun downloadRange(accessToken: String, itemId: String, offset: Long, length: Int): ByteArray {
+    internal suspend fun openDownload(accessToken: String, itemId: String): suspend (CloudRestoreRange) -> ByteArray {
         require(accessToken.isNotBlank()) { "Missing Microsoft access token." }
         require(itemId.isNotBlank()) { "Missing OneDrive item id." }
-        validateDownloadRange(offset, length)
-        val response = mClient.get("https://graph.microsoft.com/v1.0/me/drive/items/$itemId/content") {
+        val metadata = mClient.get("https://graph.microsoft.com/v1.0/me/drive/items/${Uri.encode(itemId)}") {
             header(HttpHeaders.Authorization, "Bearer $accessToken")
-            header(HttpHeaders.Range, "bytes=$offset-${offset + length - 1}")
+            parameter("\$select", "id,@microsoft.graph.downloadUrl")
         }
-        if (response.status.value != 200 && response.status.value != 206) {
-            throw DirectCloudException(response.status.value, "OneDrive range download failed.")
+        if (metadata.status.value != 200) {
+            throw DirectCloudException(metadata.status.value, "OneDrive download authorization failed.")
         }
-        return response.body()
+        val rawUrl = Json.parseToJsonElement(metadata.bodyAsText()).jsonObject["@microsoft.graph.downloadUrl"]
+            ?.jsonPrimitive?.contentOrNull
+            ?: error("Missing OneDrive preauthorized download URL.")
+        val downloadUrl = Url(rawUrl)
+        check(downloadUrl.protocol == URLProtocol.HTTPS && downloadUrl.host.isNotBlank() &&
+            downloadUrl.user == null && downloadUrl.password == null) {
+            "Invalid OneDrive preauthorized download URL."
+        }
+
+        // Microsoft Graph requires Range on this URL, not on the /content redirect.
+        // The URL is already authorized; do not add the Graph bearer token.
+        return { range ->
+            mClient.prepareGet(downloadUrl.toString()) {
+                header(HttpHeaders.Range, range.requestHeader)
+                header(HttpHeaders.AcceptEncoding, "identity")
+            }.execute { response -> response.readCloudRestoreRange(range) }
+        }
     }
 
     suspend fun deleteItem(accessToken: String, itemId: String) {

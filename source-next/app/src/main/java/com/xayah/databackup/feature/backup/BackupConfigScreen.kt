@@ -1,6 +1,10 @@
 package com.xayah.databackup.feature.backup
 
+import android.app.Activity
 import android.text.format.Formatter
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -38,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,7 +63,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.xayah.databackup.App
 import com.xayah.databackup.R
+import com.xayah.databackup.data.cloud.CloudProvider
+import com.xayah.databackup.data.cloud.CloudTokenResult
+import com.xayah.databackup.data.cloud.GoogleDriveAuthorizationClient
+import com.xayah.databackup.data.cloud.GoogleDriveAuthorizationResult
+import com.xayah.databackup.data.cloud.MicrosoftOneDriveAuthorizationClient
 import com.xayah.databackup.entity.BackupBackend
 import com.xayah.databackup.entity.BackupConfig
 import com.xayah.databackup.entity.rustic.RusticSnapshot
@@ -74,11 +86,17 @@ import com.xayah.databackup.ui.component.SectionHeader
 import com.xayah.databackup.ui.component.rememberFadingEdgeState
 import com.xayah.databackup.ui.component.surfaceTopAppBarColors
 import com.xayah.databackup.ui.component.verticalFadingEdges
+import com.xayah.databackup.util.KeyMicrosoftOneDriveClientId
+import com.xayah.databackup.util.MicrosoftOneDriveClientId
 import com.xayah.databackup.util.Navigator
+import com.xayah.databackup.util.readString
+import com.xayah.databackup.util.saveString
 import com.xayah.databackup.util.TimeHelper
 import com.xayah.databackup.util.navigateSafely
 import com.xayah.databackup.util.popBackStackSafely
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.TimeZone
 
@@ -95,6 +113,102 @@ fun BackupConfigScreen(
     val snapshots by viewModel.snapshots.collectAsStateWithLifecycle()
     val deletingSnapshot by viewModel.deletingSnapshot.collectAsStateWithLifecycle()
     val snapshotDeleteFailed by viewModel.snapshotDeleteFailed.collectAsStateWithLifecycle()
+    val cloudSync by viewModel.cloudSync.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val coroutineScope = rememberCoroutineScope()
+    val googleAuthorization = remember(context.applicationContext) {
+        GoogleDriveAuthorizationClient(context.applicationContext)
+    }
+    var microsoftClientId by rememberSaveable { mutableStateOf("") }
+    var showMicrosoftClientIdDialog by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        microsoftClientId = App.application.readString(MicrosoftOneDriveClientId).first()
+    }
+
+    val googleAuthorizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK && data != null) {
+            runCatching { googleAuthorization.finishResolution(data) }
+                .onSuccess { authorized ->
+                    viewModel.syncBackupToCloud(CloudProvider.GOOGLE_DRIVE, authorized.accessToken)
+                }
+                .onFailure { error ->
+                    viewModel.reportCloudAuthError(CloudProvider.GOOGLE_DRIVE, error)
+                }
+        } else {
+            viewModel.reportCloudAuthError(CloudProvider.GOOGLE_DRIVE, null)
+        }
+    }
+
+    val startGoogleSync: () -> Unit = {
+        coroutineScope.launch {
+            runCatching { googleAuthorization.authorize() }
+                .onSuccess { authorization ->
+                    when (authorization) {
+                        is GoogleDriveAuthorizationResult.Authorized ->
+                            viewModel.syncBackupToCloud(CloudProvider.GOOGLE_DRIVE, authorization.accessToken)
+                        is GoogleDriveAuthorizationResult.ResolutionRequired ->
+                            googleAuthorizationLauncher.launch(
+                                IntentSenderRequest.Builder(authorization.pendingIntent.intentSender).build()
+                            )
+                    }
+                }
+                .onFailure { error ->
+                    viewModel.reportCloudAuthError(CloudProvider.GOOGLE_DRIVE, error)
+                }
+        }
+    }
+
+    val startOneDriveSync: (String) -> Unit = oneDriveSync@{ clientId ->
+        val hostActivity = activity ?: run {
+            viewModel.reportCloudAuthError(
+                CloudProvider.ONEDRIVE,
+                IllegalStateException("No foreground activity for Microsoft authorization."),
+            )
+            return@oneDriveSync
+        }
+        coroutineScope.launch {
+            val cleanClientId = clientId.trim()
+            if (cleanClientId.isBlank()) {
+                viewModel.reportCloudAuthError(
+                    CloudProvider.ONEDRIVE,
+                    IllegalArgumentException("Microsoft client id is required."),
+                )
+                return@launch
+            }
+            App.application.saveString(KeyMicrosoftOneDriveClientId, cleanClientId)
+            microsoftClientId = cleanClientId
+            runCatching {
+                MicrosoftOneDriveAuthorizationClient.create(context.applicationContext, cleanClientId)
+                    .acquireToken(hostActivity)
+            }.onSuccess { authorization ->
+                when (authorization) {
+                    is CloudTokenResult.Authorized ->
+                        viewModel.syncBackupToCloud(CloudProvider.ONEDRIVE, authorization.accessToken)
+                    CloudTokenResult.Cancelled ->
+                        viewModel.reportCloudAuthError(CloudProvider.ONEDRIVE, null)
+                }
+            }.onFailure { error ->
+                viewModel.reportCloudAuthError(CloudProvider.ONEDRIVE, error)
+            }
+        }
+    }
+
+    if (showMicrosoftClientIdDialog) {
+        MicrosoftClientIdDialog(
+            initialClientId = microsoftClientId,
+            onDismissRequest = { showMicrosoftClientIdDialog = false },
+            onConfirm = { clientId ->
+                showMicrosoftClientIdDialog = false
+                startOneDriveSync(clientId)
+            },
+        )
+    }
+
     var selectedSnapshot by remember(backupConfig?.uuid, backupConfig?.path, backupConfig?.backupBackend) {
         mutableStateOf<RusticSnapshot?>(null)
     }
@@ -226,11 +340,15 @@ fun BackupConfigScreen(
                     item(key = "config") {
                         BackupConfigContent(
                             backupConfig = config,
+                            cloudSync = cloudSync,
                             onBackUpNow = {
                                 viewModel.selectBackup {
                                     navigator.navigateSafely(BackupSetupRoute)
                                 }
                             },
+                            onSyncGoogleDrive = startGoogleSync,
+                            onSyncOneDrive = { showMicrosoftClientIdDialog = true },
+                            onDismissCloudStatus = viewModel::clearCloudSyncState,
                         )
                     }
 
@@ -255,7 +373,11 @@ fun BackupConfigScreen(
 @Composable
 private fun BackupConfigContent(
     backupConfig: BackupConfig,
+    cloudSync: CloudSyncUiState,
     onBackUpNow: () -> Unit,
+    onSyncGoogleDrive: () -> Unit,
+    onSyncOneDrive: () -> Unit,
+    onDismissCloudStatus: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -267,6 +389,7 @@ private fun BackupConfigContent(
             modifier = Modifier.fillMaxWidth(),
             shape = BackupConfigContainerShape,
             onClick = onBackUpNow,
+            enabled = !cloudSync.isRunning,
         ) {
             Icon(
                 imageVector = ImageVector.vectorResource(R.drawable.ic_archive),
@@ -275,7 +398,112 @@ private fun BackupConfigContent(
             Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.back_up_now))
         }
+
+        Text(
+            text = stringResource(R.string.cloud_backup),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            shape = BackupConfigContainerShape,
+            enabled = !cloudSync.isRunning,
+            onClick = onSyncGoogleDrive,
+        ) {
+            Icon(ImageVector.vectorResource(R.drawable.ic_cloud_upload), contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text(stringResource(R.string.sync_google_drive))
+        }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            shape = BackupConfigContainerShape,
+            enabled = !cloudSync.isRunning,
+            onClick = onSyncOneDrive,
+        ) {
+            Icon(ImageVector.vectorResource(R.drawable.ic_cloud_upload), contentDescription = null)
+            Spacer(Modifier.size(8.dp))
+            Text(stringResource(R.string.sync_onedrive))
+        }
+
+        when {
+            cloudSync.isRunning -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                LoadingIndicator(modifier = Modifier.size(20.dp))
+                Text(stringResource(R.string.cloud_sync_in_progress))
+            }
+            cloudSync.stats != null -> {
+                Text(
+                    stringResource(
+                        R.string.cloud_sync_complete,
+                        cloudSync.stats.uploadedFiles,
+                        cloudSync.stats.directories,
+                        cloudSync.stats.deletedRemoteItems,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                OutlinedButton(onClick = onDismissCloudStatus) {
+                    Text(stringResource(R.string.dismiss))
+                }
+            }
+            cloudSync.error != null -> {
+                Text(
+                    text = stringResource(R.string.cloud_sync_failed, cloudSync.error),
+                    color = MaterialTheme.colorScheme.error,
+                )
+                OutlinedButton(onClick = onDismissCloudStatus) {
+                    Text(stringResource(R.string.dismiss))
+                }
+            }
+        }
     }
+}
+
+@Composable
+private fun MicrosoftClientIdDialog(
+    initialClientId: String,
+    onDismissRequest: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var clientId by rememberSaveable(initialClientId) { mutableStateOf(initialClientId) }
+    DataBackupDialog(
+        title = stringResource(R.string.onedrive_setup),
+        onDismissRequest = onDismissRequest,
+        icon = { DialogIcon(imageVector = ImageVector.vectorResource(R.drawable.ic_cloud_upload)) },
+        content = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.onedrive_client_id_desc))
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = clientId,
+                    onValueChange = { clientId = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.microsoft_client_id)) },
+                )
+                Text(
+                    text = stringResource(
+                        R.string.onedrive_redirect_uri,
+                        MicrosoftOneDriveAuthorizationClient.REDIRECT_URI,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            DialogActionButton(
+                text = stringResource(R.string.continue_label),
+                enabled = clientId.isNotBlank(),
+                onClick = { onConfirm(clientId) },
+            )
+        },
+        dismissButton = {
+            DialogDismissButton(
+                text = stringResource(R.string.cancel),
+                onClick = onDismissRequest,
+            )
+        },
+    )
 }
 
 private fun LazyListScope.backupSnapshotsItems(
