@@ -65,6 +65,7 @@ import com.xayah.databackup.ui.component.MarkdownContent
 import com.xayah.databackup.ui.component.surfaceTopAppBarColors
 import com.xayah.databackup.util.LaunchedEffect
 import com.xayah.databackup.util.Navigator
+import com.xayah.databackup.util.ProjectLinks
 import com.xayah.databackup.util.openUrl
 import com.xayah.databackup.util.popBackStackSafely
 import kotlinx.coroutines.Dispatchers
@@ -260,10 +261,16 @@ private fun UpdateOverviewCard(
                     }
 
                     UpdateActionButton(
-                        enabled = checkingUpdates.not() && updateAvailable.not(),
+                        enabled = checkingUpdates.not(),
                         containerColor = buttonContainerColor,
                         actionText = actionText,
-                        onClick = onCheckUpdates,
+                        onClick = {
+                            if (updateAvailable) {
+                                context.openUrl(ProjectLinks.RELEASES_URL)
+                            } else {
+                                onCheckUpdates()
+                            }
+                        },
                     )
                 }
             }
@@ -491,4 +498,4 @@ private fun ReleaseNotesCard(notes: String) {
     }
 }
 
-private const val GITHUB_RELEASES_URL = "https://github.com/XayahSuSuSu/Android-DataBackup/releases"
+private const val GITHUB_RELEASES_URL = ProjectLinks.RELEASES_URL

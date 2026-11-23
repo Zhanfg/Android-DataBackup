@@ -569,4 +569,12 @@
     <string name="onedrive_client_id_desc">填写在 Microsoft Entra 注册的 Android 公共客户端 ID。DataBackup 仅申请 Files.ReadWrite.AppFolder 权限。</string>
     <string name="onedrive_redirect_uri">注册以下重定向 URI：%1$s</string>
     <string name="continue_label">继续</string>
+
+    <string name="automatic_backups">自动备份</string>
+    <string name="schedule_requires_backup">请先创建一个备份配置，再启用自动备份。</string>
+    <string name="schedule_daily_summary">每天约 03:00 · %1$s</string>
+    <string name="schedule_execution">执行策略</string>
+    <string name="schedule_execution_desc">Android WorkManager 可能会为省电而推迟 03:00 的任务。每个备份配置都会作为独立的前台数据同步任务运行。</string>
+    <string name="scheduled_backup_running">计划备份</string>
+    <string name="restore_safety_desc">恢复前会校验目标位置；如果操作被中断，已经恢复的数据会保留。</string>
 </resources>

@@ -584,4 +584,12 @@
     <string name="onedrive_client_id_desc">Enter the public Android app client ID registered in Microsoft Entra. DataBackup requests only Files.ReadWrite.AppFolder.</string>
     <string name="onedrive_redirect_uri">Register this redirect URI: %1$s</string>
     <string name="continue_label">Continue</string>
+
+    <string name="automatic_backups">Automatic backups</string>
+    <string name="schedule_requires_backup">Create a backup configuration before enabling automatic backups.</string>
+    <string name="schedule_daily_summary">Daily around 03:00 · %1$s</string>
+    <string name="schedule_execution">Execution policy</string>
+    <string name="schedule_execution_desc">Android WorkManager may defer the 03:00 run to protect battery. Each backup configuration runs as a unique foreground data-sync task.</string>
+    <string name="scheduled_backup_running">Scheduled backup</string>
+    <string name="restore_safety_desc">Restore uses destination validation and preserves already restored data if an operation is interrupted.</string>
 </resources>

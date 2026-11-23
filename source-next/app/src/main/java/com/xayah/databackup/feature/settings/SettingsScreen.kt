@@ -31,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import com.xayah.databackup.BuildConfig
 import com.xayah.databackup.R
 import com.xayah.databackup.feature.AboutRoute
+import com.xayah.databackup.feature.AdvancedSettingsRoute
+import com.xayah.databackup.feature.AppearanceSettingsRoute
+import com.xayah.databackup.feature.BackupSettingsRoute
+import com.xayah.databackup.feature.RestoreSettingsRoute
 import com.xayah.databackup.ui.component.CustomSUFileDialog
 import com.xayah.databackup.ui.component.LocalFloatingNavigationBarBottomPadding
 import com.xayah.databackup.ui.component.Preference
@@ -111,6 +115,10 @@ fun SettingsScreen(navigator: Navigator) {
 
             SettingsApplicationCard(
                 modifier = Modifier.padding(horizontal = 16.dp),
+                onAppearanceClick = { navigator.navigateSafely(AppearanceSettingsRoute) },
+                onBackupClick = { navigator.navigateSafely(BackupSettingsRoute) },
+                onRestoreClick = { navigator.navigateSafely(RestoreSettingsRoute) },
+                onAdvancedClick = { navigator.navigateSafely(AdvancedSettingsRoute) },
                 onAboutClick = { navigator.navigateSafely(AboutRoute) },
             )
 
@@ -158,6 +166,10 @@ private fun SettingsOverviewCard(
 @Composable
 private fun SettingsApplicationCard(
     modifier: Modifier = Modifier,
+    onAppearanceClick: () -> Unit,
+    onBackupClick: () -> Unit,
+    onRestoreClick: () -> Unit,
+    onAdvancedClick: () -> Unit,
     onAboutClick: () -> Unit,
 ) {
     PreferenceGroup(modifier = modifier) {
@@ -165,21 +177,25 @@ private fun SettingsApplicationCard(
             icon = ImageVector.vectorResource(R.drawable.ic_palette),
             title = stringResource(R.string.appearance),
             subtitle = stringResource(R.string.app_theme_settings),
+            onClick = onAppearanceClick,
         )
         SettingsEntry(
             icon = ImageVector.vectorResource(R.drawable.ic_archive),
             title = stringResource(R.string.backup),
             subtitle = stringResource(R.string.backup_settings),
+            onClick = onBackupClick,
         )
         SettingsEntry(
             icon = ImageVector.vectorResource(R.drawable.ic_archive_restore),
             title = stringResource(R.string.restore),
             subtitle = stringResource(R.string.restore_settings),
+            onClick = onRestoreClick,
         )
         SettingsEntry(
             icon = ImageVector.vectorResource(R.drawable.ic_wrench),
             title = stringResource(R.string.advanced),
             subtitle = stringResource(R.string.advanced_settings),
+            onClick = onAdvancedClick,
         )
         SettingsEntry(
             icon = ImageVector.vectorResource(R.drawable.ic_layout_grid),

@@ -1,0 +1,92 @@
+name: Publish Preview Release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    defaults:
+      run:
+        working-directory: source-next
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Install Android native toolchain
+        run: |
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "ndk;30.0.16248370" "cmake;3.22.1"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify tests
+        run: |
+          ./gradlew test --stacktrace
+          cargo test --manifest-path native/src/main/jni/rustic/Cargo.toml
+
+      - name: Assemble preview APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Verify APK
+        run: |
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          test -n "$APK"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          BUILD_TOOLS="$(find "$SDK_ROOT/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(sed -n 's/^versionName = "\(.*\)"/\1/p' gradle/libs.versions.toml | head -n 1)"
+          test -n "$VERSION"
+          TAG="v$VERSION"
+          APK="$(find app/build/outputs/apk/debug -name '*.apk' -type f | head -n 1)"
+          ASSET="Android-DataBackup-$VERSION.apk"
+          cp "$APK" "$ASSET"
+          SHA256="$(sha256sum "$ASSET" | awk '{print $1}')"
+          NOTES="$(mktemp)"
+          {
+            echo "DataBackup $VERSION"
+            echo
+            echo "Maintained release from Zhanfg/Android-DataBackup."
+            echo
+            echo "SHA-256: \`$SHA256\`"
+            echo
+            echo "Preview builds use test signing. A stable release signing key will be configured before the final 3.0.0 release."
+          } > "$NOTES"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "DataBackup $VERSION" --notes-file "$NOTES" --latest
+          fi

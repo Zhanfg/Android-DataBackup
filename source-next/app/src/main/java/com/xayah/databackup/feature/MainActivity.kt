@@ -40,6 +40,10 @@ import com.xayah.databackup.feature.backup.messages.BackupMessagesScreen
 import com.xayah.databackup.feature.backup.networks.BackupNetworksScreen
 import com.xayah.databackup.feature.backup.rustic.RusticBackupProcessScreen
 import com.xayah.databackup.feature.restore.RestoreNavigationHost
+import com.xayah.databackup.feature.settings.AdvancedSettingsScreen
+import com.xayah.databackup.feature.settings.AppearanceSettingsScreen
+import com.xayah.databackup.feature.settings.BackupSettingsScreen
+import com.xayah.databackup.feature.settings.RestoreSettingsScreen
 import com.xayah.databackup.feature.restore.RestoreViewModel
 import com.xayah.databackup.feature.setup.NoPermKey
 import com.xayah.databackup.feature.setup.SetupActivity
@@ -177,6 +181,22 @@ class MainActivity : ComponentActivity() {
 
                             entry<UpdatesRoute> {
                                 UpdatesScreen(navigator)
+                            }
+
+                            entry<AppearanceSettingsRoute> {
+                                AppearanceSettingsScreen(navigator)
+                            }
+
+                            entry<BackupSettingsRoute> {
+                                BackupSettingsScreen(navigator)
+                            }
+
+                            entry<RestoreSettingsRoute> {
+                                RestoreSettingsScreen(navigator)
+                            }
+
+                            entry<AdvancedSettingsRoute> {
+                                AdvancedSettingsScreen(navigator)
                             }
 
                             entry<AboutRoute> {

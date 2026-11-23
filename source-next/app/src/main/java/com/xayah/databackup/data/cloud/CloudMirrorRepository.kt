@@ -66,8 +66,8 @@ class CloudMirrorRepository(
                     .singleOrNull { it.name == CLOUD_ROOT && it.isDirectory }
                     ?: return emptyList()
                 mGoogleDrive.listChildren(accessToken, appRoot.id)
-                    .filter(CloudRemoteItem::isDirectory)
-                    .map(CloudRemoteItem::name)
+                    .filter { it.isDirectory }
+                    .map { it.name }
                     .distinct()
                     .sorted()
             }
@@ -76,8 +76,8 @@ class CloudMirrorRepository(
                     .singleOrNull { it.name == CLOUD_ROOT && it.isDirectory }
                     ?: return emptyList()
                 mOneDrive.listChildren(accessToken, CLOUD_ROOT)
-                    .filter(CloudRemoteItem::isDirectory)
-                    .map(CloudRemoteItem::name)
+                    .filter { it.isDirectory }
+                    .map { it.name }
                     .distinct()
                     .sorted()
             }
@@ -283,7 +283,7 @@ class CloudMirrorRepository(
 
     private suspend fun ensureGoogleFolder(accessToken: String, parentId: String, name: String): CloudRemoteItem {
         val matching = mGoogleDrive.listChildren(accessToken, parentId).filter { it.name == name }
-        val folder = matching.firstOrNull(CloudRemoteItem::isDirectory)
+        val folder = matching.firstOrNull { it.isDirectory }
         matching.filter { it.id != folder?.id }.forEach { mGoogleDrive.deleteItem(accessToken, it.id) }
         return folder ?: mGoogleDrive.createFolder(accessToken, name, parentId)
     }
