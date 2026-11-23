@@ -9,6 +9,7 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch
+import io.ktor.client.request.prepareGet
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
@@ -115,19 +116,15 @@ class GoogleDriveDirectUploadClient : Closeable {
         )
     }
 
-    suspend fun downloadRange(accessToken: String, fileId: String, offset: Long, length: Int): ByteArray {
+    internal suspend fun downloadRange(accessToken: String, fileId: String, range: CloudRestoreRange): ByteArray {
         require(accessToken.isNotBlank()) { "Missing Google access token." }
         require(fileId.isNotBlank()) { "Missing Drive file id." }
-        validateDownloadRange(offset, length)
-        val response = mClient.get("https://www.googleapis.com/drive/v3/files/$fileId") {
+        return mClient.prepareGet("https://www.googleapis.com/drive/v3/files/$fileId") {
             header(HttpHeaders.Authorization, "Bearer $accessToken")
-            header(HttpHeaders.Range, "bytes=$offset-${offset + length - 1}")
+            header(HttpHeaders.Range, range.requestHeader)
+            header(HttpHeaders.AcceptEncoding, "identity")
             parameter("alt", "media")
-        }
-        if (response.status.value != 200 && response.status.value != 206) {
-            throw DirectCloudException(response.status.value, "Google Drive range download failed.")
-        }
-        return response.body()
+        }.execute { response -> response.readCloudRestoreRange(range) }
     }
 
     suspend fun deleteItem(accessToken: String, fileId: String) {

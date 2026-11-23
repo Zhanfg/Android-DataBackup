@@ -29,7 +29,6 @@ class CloudMirrorRepository(
 ) {
     companion object {
         const val CLOUD_ROOT = "AndroidDataBackup"
-        private const val DOWNLOAD_CHUNK = 4 * 1024 * 1024
     }
 
     suspend fun uploadBackup(
@@ -223,8 +222,8 @@ class CloudMirrorRepository(
                 check(localPath.mkdir()) { "Could not create a restore staging directory." }
                 stats += downloadGoogleDirectory(accessToken, item.id, localPath)
             } else {
-                downloadFile(localPath, requireNotNull(item.size)) { offset, length ->
-                    mGoogleDrive.downloadRange(accessToken, item.id, offset, length)
+                downloadStagedCloudFile(localPath, requireNotNull(item.size)) { range ->
+                    mGoogleDrive.downloadRange(accessToken, item.id, range)
                 }
                 stats += CloudMirrorStats(downloadedFiles = 1)
             }
@@ -251,34 +250,17 @@ class CloudMirrorRepository(
                     localPath,
                 )
             } else {
-                downloadFile(localPath, requireNotNull(item.size)) { offset, length ->
-                    mOneDrive.downloadRange(accessToken, item.id, offset, length)
+                val size = requireNotNull(item.size)
+                if (size == 0L) {
+                    downloadStagedCloudFile(localPath, size) { error("Empty file has no ranges.") }
+                } else {
+                    val download = mOneDrive.openDownload(accessToken, item.id)
+                    downloadStagedCloudFile(localPath, size, readRange = download)
                 }
                 stats += CloudMirrorStats(downloadedFiles = 1)
             }
         }
         return stats
-    }
-
-    private suspend fun downloadFile(
-        localPath: File,
-        size: Long,
-        read: suspend (Long, Int) -> ByteArray,
-    ) {
-        require(size >= 0)
-        check(localPath.createNewFile()) { "Restore staging file already exists." }
-        localPath.outputStream().use { output ->
-            var offset = 0L
-            while (offset < size) {
-                currentCoroutineContext().ensureActive()
-                val length = minOf(DOWNLOAD_CHUNK.toLong(), size - offset).toInt()
-                val bytes = read(offset, length)
-                check(bytes.isNotEmpty() && bytes.size <= length)
-                output.write(bytes)
-                offset += bytes.size
-            }
-            check(offset == size)
-        }
     }
 
     private suspend fun ensureGoogleFolder(accessToken: String, parentId: String, name: String): CloudRemoteItem {

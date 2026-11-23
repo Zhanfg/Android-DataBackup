@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - maint/3.x
+      - wip/cloud-ui-v1
     paths:
       - 'source-next/**'
       - '.gitmodules'
