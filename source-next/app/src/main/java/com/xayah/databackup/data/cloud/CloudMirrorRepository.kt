@@ -1,8 +1,11 @@
 package com.xayah.databackup.data.cloud
 
-import android.os.ParcelFileDescriptor
+import android.content.Context
 import com.xayah.databackup.entity.BackupConfig
 import com.xayah.databackup.rootservice.RemoteRootService
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.io.File
 
 data class CloudMirrorStats(
     val uploadedFiles: Int = 0,
@@ -22,6 +25,7 @@ class CloudMirrorRepository(
     private val mTransfers: DirectCloudTransferRepository,
     private val mGoogleDrive: GoogleDriveDirectUploadClient,
     private val mOneDrive: OneDriveDirectUploadClient,
+    private val mContext: Context,
 ) {
     companion object {
         const val CLOUD_ROOT = "AndroidDataBackup"
@@ -55,8 +59,8 @@ class CloudMirrorRepository(
         }
     }
 
-    suspend fun listRemoteBackupIds(provider: CloudProvider, accessToken: String): List<String> =
-        when (provider) {
+    suspend fun listRemoteBackupIds(provider: CloudProvider, accessToken: String): List<String> {
+        return when (provider) {
             CloudProvider.GOOGLE_DRIVE -> {
                 val appRoot = mGoogleDrive.listChildren(accessToken, "root")
                     .singleOrNull { it.name == CLOUD_ROOT && it.isDirectory }
@@ -78,41 +82,42 @@ class CloudMirrorRepository(
                     .sorted()
             }
         }
+    }
 
-    suspend fun downloadBackup(
+    /**
+     * Downloads a checked snapshot to an isolated, app-private cache lease for inspection.
+     * No caller-provided local destination is accepted, and this does not apply a restore.
+     */
+    suspend fun <T> withStagedCloudBackup(
         provider: CloudProvider,
         accessToken: String,
         backupUuid: String,
-        destinationPath: String,
-    ): CloudMirrorStats {
+        consume: suspend (CloudRestoreReader, CloudMirrorStats) -> T,
+    ): T {
         require(accessToken.isNotBlank())
-        require(backupUuid.isNotBlank())
-        require(destinationPath.isNotBlank())
+        requireCloudRestoreChildName(backupUuid)
 
-        if (RemoteRootService.exists(destinationPath)) {
-            check(RemoteRootService.deleteRecursively(destinationPath)) {
-                "Failed to clear cloud restore destination."
+        return withCloudRestoreStage(
+            cacheDirectory = mContext.cacheDir,
+            preflight = {
+                when (provider) {
+                    CloudProvider.GOOGLE_DRIVE -> {
+                        val appRoot = requireGoogleFolder(accessToken, "root", CLOUD_ROOT)
+                        requireGoogleFolder(accessToken, appRoot.id, backupUuid).id
+                    }
+                    CloudProvider.ONEDRIVE -> {
+                        requireOneDriveFolder(accessToken, "", CLOUD_ROOT)
+                        requireOneDriveFolder(accessToken, CLOUD_ROOT, backupUuid)
+                        "$CLOUD_ROOT/$backupUuid"
+                    }
+                }
+            },
+        ) { remoteRoot, stage ->
+            val stats = when (provider) {
+                CloudProvider.GOOGLE_DRIVE -> downloadGoogleDirectory(accessToken, remoteRoot, stage.directory)
+                CloudProvider.ONEDRIVE -> downloadOneDriveDirectory(accessToken, remoteRoot, stage.directory)
             }
-        }
-        check(RemoteRootService.mkdirs(destinationPath)) {
-            "Failed to create cloud restore destination."
-        }
-
-        return when (provider) {
-            CloudProvider.GOOGLE_DRIVE -> {
-                val appRoot = requireGoogleFolder(accessToken, "root", CLOUD_ROOT)
-                val backupRoot = requireGoogleFolder(accessToken, appRoot.id, backupUuid)
-                downloadGoogleDirectory(accessToken, backupRoot.id, destinationPath)
-            }
-            CloudProvider.ONEDRIVE -> {
-                requireOneDriveFolder(accessToken, "", CLOUD_ROOT)
-                requireOneDriveFolder(accessToken, CLOUD_ROOT, backupUuid)
-                downloadOneDriveDirectory(
-                    accessToken,
-                    "$CLOUD_ROOT/$backupUuid",
-                    destinationPath,
-                )
-            }
+            consume(stage.reader, stats)
         }
     }
 
@@ -206,15 +211,16 @@ class CloudMirrorRepository(
     private suspend fun downloadGoogleDirectory(
         accessToken: String,
         remoteParentId: String,
-        localDirectory: String,
+        localDirectory: File,
     ): CloudMirrorStats {
         val remoteItems = mGoogleDrive.listChildren(accessToken, remoteParentId)
         requireUniqueNames(remoteItems)
         var stats = CloudMirrorStats(directories = 1)
         for (item in remoteItems) {
-            val localPath = localDirectory.trimEnd('/') + "/" + item.name
+            currentCoroutineContext().ensureActive()
+            val localPath = cloudRestoreChild(localDirectory, item.name)
             if (item.isDirectory) {
-                check(RemoteRootService.mkdirs(localPath))
+                check(localPath.mkdir()) { "Could not create a restore staging directory." }
                 stats += downloadGoogleDirectory(accessToken, item.id, localPath)
             } else {
                 downloadFile(localPath, requireNotNull(item.size)) { offset, length ->
@@ -229,15 +235,16 @@ class CloudMirrorRepository(
     private suspend fun downloadOneDriveDirectory(
         accessToken: String,
         remoteDirectory: String,
-        localDirectory: String,
+        localDirectory: File,
     ): CloudMirrorStats {
         val remoteItems = mOneDrive.listChildren(accessToken, remoteDirectory)
         requireUniqueNames(remoteItems)
         var stats = CloudMirrorStats(directories = 1)
         for (item in remoteItems) {
-            val localPath = localDirectory.trimEnd('/') + "/" + item.name
+            currentCoroutineContext().ensureActive()
+            val localPath = cloudRestoreChild(localDirectory, item.name)
             if (item.isDirectory) {
-                check(RemoteRootService.mkdirs(localPath))
+                check(localPath.mkdir()) { "Could not create a restore staging directory." }
                 stats += downloadOneDriveDirectory(
                     accessToken,
                     remoteDirectory.trimEnd('/') + "/" + item.name,
@@ -254,15 +261,16 @@ class CloudMirrorRepository(
     }
 
     private suspend fun downloadFile(
-        localPath: String,
+        localPath: File,
         size: Long,
         read: suspend (Long, Int) -> ByteArray,
     ) {
         require(size >= 0)
-        val pfd = requireNotNull(RemoteRootService.openWriteTruncate(localPath))
-        ParcelFileDescriptor.AutoCloseOutputStream(pfd).use { output ->
+        check(localPath.createNewFile()) { "Restore staging file already exists." }
+        localPath.outputStream().use { output ->
             var offset = 0L
             while (offset < size) {
+                currentCoroutineContext().ensureActive()
                 val length = minOf(DOWNLOAD_CHUNK.toLong(), size - offset).toInt()
                 val bytes = read(offset, length)
                 check(bytes.isNotEmpty() && bytes.size <= length)
@@ -298,6 +306,7 @@ class CloudMirrorRepository(
             ?: error("OneDrive backup folder is missing or ambiguous: $name")
 
     private fun requireUniqueNames(items: List<CloudRemoteItem>) {
+        items.forEach { requireCloudRestoreChildName(it.name) }
         val duplicate = items.groupingBy(CloudRemoteItem::name).eachCount().entries.firstOrNull { it.value > 1 }
         require(duplicate == null) { "Cloud backup contains duplicate name: ${duplicate?.key}" }
     }
